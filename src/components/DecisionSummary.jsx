@@ -10,7 +10,7 @@ export default function DecisionSummary({ last, prev, currency, paperSnapshot })
   const risk = last?.atr && last?.close ? last.close - last.atr * 2 : null;
   return (
     <section aria-label="현재 판단 요약" style={styles.wrap}>
-      <Card label="종합 시그널" value={signal.text} detail={last?.signalScore == null ? '—' : `점수 ${last.signalScore >= 0 ? '+' : ''}${last.signalScore.toFixed(2)}`} tone={signal.tone} />
+      <Card featured label="현재 가장 중요한 판단 · 종합 시그널" value={signal.text} detail={last?.signalScore == null ? '—' : `점수 ${last.signalScore >= 0 ? '+' : ''}${last.signalScore.toFixed(2)}`} tone={signal.tone} />
       <Card label="현재가" value={formatPrice(last?.close, currency)} detail={change == null ? '변동률 없음' : `전일 대비 ${formatPercentSigned(change)}`} tone={change != null && change >= 0 ? 'good' : 'critical'} />
       <Card label="타이밍" value={timing[0]} detail={`${last?.timing?.buyPoints ?? 0} 매수 / ${last?.timing?.sellPoints ?? 0} 매도 조건`} tone={timing[1]} />
       <Card label="리스크 기준" value={risk == null ? '—' : formatPrice(risk, currency)} detail={risk == null ? 'ATR 계산 대기' : 'ATR×2 손절 참고선'} tone="warning" />
@@ -19,8 +19,8 @@ export default function DecisionSummary({ last, prev, currency, paperSnapshot })
   );
 }
 
-function Card({ label, value, detail, tone }) {
-  return <div style={{ ...styles.card, ...toneCard(tone), borderTopColor: `var(--status-${tone})` }}><span style={styles.label}>{label}</span><strong style={{ color: tone === 'critical' ? '#dbeafe' : `var(--status-${tone})` }}>{value}</strong><small>{detail}</small></div>;
+function Card({ label, value, detail, tone, featured = false }) {
+  return <div style={{ ...styles.card, ...(featured ? styles.featured : {}), ...toneCard(tone), borderTopColor: `var(--status-${tone})` }}><span style={styles.label}>{label}</span><strong style={{ color: tone === 'critical' ? '#dbeafe' : `var(--status-${tone})` }}>{value}</strong><small>{detail}</small></div>;
 }
 
 function toneCard(tone) {
@@ -31,7 +31,8 @@ function toneCard(tone) {
 
 const styles = {
   wrap: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(145px, 1fr))', gap: 8 },
-  card: { background: 'var(--surface-card-alt)', border: '1px solid var(--border)', borderTop: '3px solid', borderRadius: 7, padding: '11px 12px', display: 'flex', flexDirection: 'column', gap: 5, minHeight: 86 },
-  account: { background: 'var(--accent-soft)', border: '1px solid var(--accent)', borderRadius: 7, padding: '11px 12px', display: 'flex', flexDirection: 'column', gap: 5, minHeight: 86 },
+  card: { background: 'var(--surface-card-alt)', border: '1px solid var(--border)', borderTop: '3px solid', borderRadius: 'var(--radius-card)', padding: '14px 15px', display: 'flex', flexDirection: 'column', gap: 5, minHeight: 92, boxShadow: 'var(--shadow-soft)' },
+  featured: { gridColumn: 'span 2', minHeight: 118, padding: '18px 20px' },
+  account: { background: 'var(--accent-soft)', border: '1px solid var(--accent)', borderRadius: 'var(--radius-card)', padding: '14px 15px', display: 'flex', flexDirection: 'column', gap: 5, minHeight: 92, boxShadow: 'var(--shadow-soft)' },
   label: { color: 'var(--text-muted)', fontSize: 10.5, fontWeight: 700 },
 };

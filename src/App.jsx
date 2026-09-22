@@ -16,6 +16,8 @@ import StrategyPanel from './components/StrategyPanel';
 import DashboardTabs from './components/DashboardTabs';
 import DecisionSummary from './components/DecisionSummary';
 import MarketInsightPanel from './components/MarketInsightPanel';
+import PeerGroupPanel from './components/PeerGroupPanel';
+import { PEER_GROUPS } from './components/PeerGroupPanel';
 import { executePaperOrder, getPortfolioSnapshot, loadPaperState, persistPaperState, resetPaperState, updatePositionPrice } from './utils/paperTrading';
 
 const DEFAULT_TICKER = SAMPLE_TICKERS[0].id;
@@ -32,6 +34,8 @@ export default function App() {
   const [paper, setPaper] = useState(loadPaperState);
   const [tradeMessage, setTradeMessage] = useState('');
   const [autoRefresh, setAutoRefresh] = useState(false);
+  const [peerData, setPeerData] = useState({});
+  const [peerLoading, setPeerLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('signal');
   const [competitionMode, setCompetitionMode] = useState(false);
 
@@ -51,12 +55,14 @@ export default function App() {
 
   function handleSelectSample(id) {
     setError('');
+    setPeerData({});
     setSource({ type: 'sample', id });
     setRawData(getSampleData(id));
   }
 
   async function handleUpload(file) {
     setError('');
+    setPeerData({});
     try {
       const rows = await parseCsvFile(file);
       setRawData(rows);
@@ -75,14 +81,21 @@ export default function App() {
       setRawData(rows);
       setLiveCurrency(cur);
       setSource({ type: 'live', id: symbol.toUpperCase() });
+      const peerIds = PEER_GROUPS[symbol.toUpperCase()]?.peers ?? [];
+      setPeerLoading(peerIds.length > 0);
+      const peerResults = await Promise.allSettled(peerIds.map(async (peerId) => [peerId, (await fetchTossCandles(peerId, { interval: '1d', count: 200 })).rows]));
+      setPeerData(Object.fromEntries(peerResults.filter((result) => result.status === 'fulfilled').map((result) => result.value)));
+      setPeerLoading(false);
     } catch (e) {
       if (fallbackToSample) {
         setSource({ type: 'sample', id: DEFAULT_TICKER });
         setRawData(getSampleData(DEFAULT_TICKER));
+        setPeerData({});
         setError('실시간 조회에 실패해 샘플 데이터를 표시하고 있습니다.');
       } else {
         setError(e.message || '실시간 데이터를 불러오지 못했습니다.');
       }
+      setPeerLoading(false);
     } finally {
       setLiveLoading(false);
     }
@@ -200,10 +213,6 @@ export default function App() {
           {enriched.length > 0 && (
             <>
               <DecisionSummary last={last} prev={prev} currency={currency} paperSnapshot={paperSnapshot} />
-              <DashboardTabs activeTab={activeTab} onChange={setActiveTab} competitionMode={competitionMode} onCompetitionModeChange={setCompetitionMode} />
-
-              {(activeTab === 'signal' || competitionMode) && <div style={styles.card}><MarketInsightPanel data={enriched} last={last} prev={prev} currency={currency} symbol={paperSymbol} label={label} sourceType={source.type} /></div>}
-
               <StatTiles
                 last={last?.close}
                 prev={prev?.close}
@@ -219,6 +228,11 @@ export default function App() {
                 weightRsi={last?.weightRsi}
                 weightMacd={last?.weightMacd}
               />
+              <DashboardTabs activeTab={activeTab} onChange={setActiveTab} competitionMode={competitionMode} onCompetitionModeChange={setCompetitionMode} />
+
+              {(activeTab === 'signal' || competitionMode) && <div style={styles.card}><MarketInsightPanel data={enriched} last={last} prev={prev} currency={currency} symbol={paperSymbol} label={label} sourceType={source.type} /></div>}
+
+              {(activeTab === 'signal' || competitionMode) && <div style={styles.card}><PeerGroupPanel data={enriched} symbol={paperSymbol} sourceType={source.type} peerData={peerData} peerLoading={peerLoading} /></div>}
 
               {(activeTab === 'signal' || competitionMode) && <div style={styles.card}><TimingPanel last={last} currency={currency} /></div>}
 
@@ -272,12 +286,12 @@ export default function App() {
 
 const styles = {
   page: {
-    maxWidth: 1080,
+    maxWidth: 1120,
     margin: '0 auto',
-    padding: '24px 20px 60px',
+    padding: '28px 22px 64px',
     display: 'flex',
     flexDirection: 'column',
-    gap: 18,
+    gap: 20,
   },
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 8 },
   main: { display: 'flex', flexDirection: 'column', gap: 18 },
@@ -302,8 +316,9 @@ const styles = {
   card: {
     background: 'var(--surface-card)',
     border: '1px solid var(--border)',
-    borderRadius: 6,
-    padding: '16px 16px 8px',
+    borderRadius: 'var(--radius-card)',
+    padding: '20px 20px 12px',
+    boxShadow: 'var(--shadow-soft)',
   },
   tableHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 },
   sectionTitle: { margin: '0 0 12px', fontSize: 14, color: 'var(--text-secondary)' },

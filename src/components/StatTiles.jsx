@@ -139,8 +139,9 @@ const styles = {
   wrap: { display: 'flex', flexDirection: 'column', gap: 12 },
   hero: {
     border: '1px solid var(--border)',
-    borderRadius: 6,
-    padding: '16px 18px',
+    borderRadius: 'var(--radius-panel)',
+    padding: '20px 22px',
+    boxShadow: 'var(--shadow-soft)',
   },
   heroTone: (tone) => ({
     background:
@@ -190,7 +191,7 @@ const styles = {
     paddingTop: 8,
     borderTop: '1px solid var(--gridline)',
   },
-  row: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 1, background: 'var(--border)', border: '1px solid var(--border)', borderRadius: 6, overflow: 'hidden' },
+  row: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 1, background: 'var(--border)', border: '1px solid var(--border)', borderRadius: 'var(--radius-card)', overflow: 'hidden', boxShadow: 'var(--shadow-soft)' },
   tile: {
     background: 'var(--surface-card)',
     padding: '12px 14px',
