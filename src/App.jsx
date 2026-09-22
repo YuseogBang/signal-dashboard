@@ -7,7 +7,7 @@ import DataTable from './components/DataTable';
 import RiskPanel from './components/RiskPanel';
 import BacktestPanel from './components/BacktestPanel';
 import TimingPanel from './components/TimingPanel';
-import { getSampleData, SAMPLE_TICKERS } from './data/sampleData';
+import { getSampleData, getTickerMeta, SAMPLE_TICKERS } from './data/sampleData';
 import { compareStrategies, compositeSignal, runBacktest } from './utils/indicators';
 import { parseCsvFile } from './utils/csv';
 import { fetchTossCandles } from './utils/tossApi';
@@ -17,6 +17,7 @@ import DashboardTabs from './components/DashboardTabs';
 import DecisionSummary from './components/DecisionSummary';
 import MarketInsightPanel from './components/MarketInsightPanel';
 import PeerGroupPanel from './components/PeerGroupPanel';
+import PositioningPanel from './components/PositioningPanel';
 import { PEER_GROUPS } from './components/PeerGroupPanel';
 import { executePaperOrder, getPortfolioSnapshot, loadPaperState, persistPaperState, resetPaperState, updatePositionPrice } from './utils/paperTrading';
 
@@ -49,7 +50,7 @@ export default function App() {
 
   const label = useMemo(() => {
     if (source.type === 'sample') return SAMPLE_TICKERS.find((t) => t.id === source.id)?.label ?? '';
-    if (source.type === 'live') return `${source.id} (실시간)`;
+    if (source.type === 'live') return `${getTickerMeta(source.id).name} · ${source.id} (실시간)`;
     return uploadedName || '업로드된 데이터';
   }, [source, uploadedName]);
 
@@ -233,6 +234,8 @@ export default function App() {
               {(activeTab === 'signal' || competitionMode) && <div style={styles.card}><MarketInsightPanel data={enriched} last={last} prev={prev} currency={currency} symbol={paperSymbol} label={label} sourceType={source.type} /></div>}
 
               {(activeTab === 'signal' || competitionMode) && <div style={styles.card}><PeerGroupPanel data={enriched} symbol={paperSymbol} sourceType={source.type} peerData={peerData} peerLoading={peerLoading} /></div>}
+
+              {(activeTab === 'signal' || competitionMode) && <div style={styles.card}><PositioningPanel symbol={paperSymbol} data={enriched} last={last} peerData={peerData} sourceType={source.type} /></div>}
 
               {(activeTab === 'signal' || competitionMode) && <div style={styles.card}><TimingPanel last={last} currency={currency} /></div>}
 

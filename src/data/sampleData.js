@@ -140,6 +140,24 @@ export const SAMPLE_TICKERS = [
   },
 ];
 
+export const TICKER_META = {
+  '005930': { name: '삼성전자', market: 'KOSPI', currency: 'KRW' },
+  '000660': { name: 'SK하이닉스', market: 'KOSPI', currency: 'KRW' },
+  '042700': { name: '한미반도체', market: 'KOSPI', currency: 'KRW' },
+  NVDA: { name: 'NVIDIA', market: 'NASDAQ', currency: 'USD' },
+  AMD: { name: 'AMD', market: 'NASDAQ', currency: 'USD' },
+  AAPL: { name: 'Apple', market: 'NASDAQ', currency: 'USD' },
+  MSFT: { name: 'Microsoft', market: 'NASDAQ', currency: 'USD' },
+  TSLA: { name: 'Tesla', market: 'NASDAQ', currency: 'USD' },
+  AMZN: { name: 'Amazon', market: 'NASDAQ', currency: 'USD' },
+  GOOGL: { name: 'Alphabet', market: 'NASDAQ', currency: 'USD' },
+};
+
+export function getTickerMeta(value) {
+  const id = String(value ?? '').trim().toUpperCase();
+  return TICKER_META[id] ?? { name: id || '알 수 없는 종목', market: id.length === 6 && /^\d+$/.test(id) ? 'KRX' : '해외시장', currency: 'KRW' };
+}
+
 export function getSampleData(id) {
   const t = SAMPLE_TICKERS.find((t) => t.id === id);
   return t ? t.gen() : [];

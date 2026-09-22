@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { SAMPLE_TICKERS } from '../data/sampleData';
+import { getTickerMeta, SAMPLE_TICKERS } from '../data/sampleData';
 
 export default function ControlPanel({
   source,
@@ -20,6 +20,9 @@ export default function ControlPanel({
     if (!trimmed || liveLoading) return;
     onLiveLookup(trimmed);
   }
+
+  const tickerMeta = getTickerMeta(symbolInput);
+  const isKnownTicker = Boolean(symbolInput.trim()) && tickerMeta.name !== symbolInput.trim().toUpperCase();
 
   return (
     <div style={styles.wrap}>
@@ -43,6 +46,7 @@ export default function ControlPanel({
               {liveLoading ? '조회 중…' : '조회'}
             </button>
           </div>
+          {isKnownTicker ? <span style={styles.tickerHint}>{tickerMeta.name} · {tickerMeta.market} · {tickerMeta.currency}</span> : <span style={styles.hint}>티커를 입력하면 등록된 종목명을 먼저 표시합니다.</span>}
           <span style={styles.hint}>먼저 실시간 데이터를 시도하고, 실패하면 샘플 데이터로 전환합니다.</span>
         </form>
       )}
@@ -132,6 +136,7 @@ const styles = {
     width: 130,
   },
   hint: { fontSize: 11, color: 'var(--text-muted)' },
+  tickerHint: { fontSize: 11.5, color: 'var(--accent-strong)', fontWeight: 700 },
   error: {
     fontSize: 13,
     color: 'var(--status-critical)',
