@@ -13,6 +13,9 @@ import { parseCsvFile } from './utils/csv';
 import { fetchTossCandles } from './utils/tossApi';
 import PaperTradingPanel from './components/PaperTradingPanel';
 import StrategyPanel from './components/StrategyPanel';
+import DashboardTabs from './components/DashboardTabs';
+import DecisionSummary from './components/DecisionSummary';
+import MarketInsightPanel from './components/MarketInsightPanel';
 import { executePaperOrder, getPortfolioSnapshot, loadPaperState, persistPaperState, resetPaperState, updatePositionPrice } from './utils/paperTrading';
 
 const DEFAULT_TICKER = SAMPLE_TICKERS[0].id;
@@ -29,6 +32,8 @@ export default function App() {
   const [paper, setPaper] = useState(loadPaperState);
   const [tradeMessage, setTradeMessage] = useState('');
   const [autoRefresh, setAutoRefresh] = useState(false);
+  const [activeTab, setActiveTab] = useState('signal');
+  const [competitionMode, setCompetitionMode] = useState(false);
 
   const currency = useMemo(() => {
     if (source.type === 'sample') {
@@ -194,6 +199,11 @@ export default function App() {
 
           {enriched.length > 0 && (
             <>
+              <DecisionSummary last={last} prev={prev} currency={currency} paperSnapshot={paperSnapshot} />
+              <DashboardTabs activeTab={activeTab} onChange={setActiveTab} competitionMode={competitionMode} onCompetitionModeChange={setCompetitionMode} />
+
+              {(activeTab === 'signal' || competitionMode) && <div style={styles.card}><MarketInsightPanel data={enriched} last={last} prev={prev} currency={currency} symbol={paperSymbol} label={label} sourceType={source.type} /></div>}
+
               <StatTiles
                 last={last?.close}
                 prev={prev?.close}
@@ -210,49 +220,29 @@ export default function App() {
                 weightMacd={last?.weightMacd}
               />
 
-              <div style={styles.card}>
-                <TimingPanel last={last} currency={currency} />
-              </div>
+              {(activeTab === 'signal' || competitionMode) && <div style={styles.card}><TimingPanel last={last} currency={currency} /></div>}
 
-              <div style={styles.card}>
-                <PaperTradingPanel
-                  symbol={paperSymbol}
-                  currency={currency}
-                  last={last}
-                  paper={paper}
-                  snapshot={paperSnapshot}
-                  onOrder={handlePaperOrder}
-                  onJournal={handleJournal}
-                  onReset={handlePaperReset}
-                />
+              {(activeTab === 'signal' || competitionMode) && <div style={styles.card}><PriceChart data={enriched} currency={currency} last={last} /></div>}
+
+              {!competitionMode && activeTab === 'signal' && <div style={styles.card}><IndicatorPanel data={enriched} /></div>}
+
+              {(activeTab === 'paper' || activeTab === 'journal' || competitionMode) && <div style={styles.card}>
+                <PaperTradingPanel symbol={paperSymbol} currency={currency} last={last} paper={paper} snapshot={paperSnapshot} onOrder={handlePaperOrder} onJournal={handleJournal} onReset={handlePaperReset} />
                 {tradeMessage && <div role="status" style={styles.tradeMessage}>{tradeMessage}</div>}
-              </div>
+              </div>}
 
-              <div style={styles.card}>
-                <PriceChart data={enriched} currency={currency} />
-              </div>
+              {!competitionMode && (activeTab === 'paper' || activeTab === 'signal') && <div style={styles.card}><RiskPanel last={last} currency={currency} /></div>}
 
-              <div style={styles.card}>
-                <IndicatorPanel data={enriched} />
-              </div>
+              {!competitionMode && activeTab === 'backtest' && backtest && <div style={styles.card}><BacktestPanel backtest={backtest} /></div>}
 
-              <div style={styles.card}>
-                <RiskPanel last={last} currency={currency} />
-              </div>
+              {!competitionMode && activeTab === 'backtest' && strategies.length > 0 && <div style={styles.card}><StrategyPanel strategies={strategies} /></div>}
 
-              {backtest && (
-                <div style={styles.card}>
-                  <BacktestPanel backtest={backtest} />
-                </div>
-              )}
+              {!competitionMode && activeTab === 'journal' && <div style={styles.card}>
+                <h2 style={styles.sectionTitle}>일별 데이터·체결 분석</h2>
+                <DataTable data={enriched} currency={currency} />
+              </div>}
 
-              {strategies.length > 0 && (
-                <div style={styles.card}>
-                  <StrategyPanel strategies={strategies} />
-                </div>
-              )}
-
-              <div style={styles.tableHeader}>
+              {!competitionMode && activeTab === 'signal' && <div style={styles.tableHeader}>
                 <h2 style={{ margin: 0, fontSize: 14, color: 'var(--text-secondary)' }}>일별 데이터 &amp; 시그널</h2>
                 <button
                   type="button"
@@ -262,8 +252,8 @@ export default function App() {
                 >
                   {showTable ? '테이블 숨기기' : '테이블 보기'}
                 </button>
-              </div>
-              {showTable && <DataTable data={enriched} currency={currency} />}
+              </div>}
+              {!competitionMode && activeTab === 'signal' && showTable && <DataTable data={enriched} currency={currency} />}
             </>
           )}
         </main>
@@ -316,6 +306,7 @@ const styles = {
     padding: '16px 16px 8px',
   },
   tableHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 },
+  sectionTitle: { margin: '0 0 12px', fontSize: 14, color: 'var(--text-secondary)' },
   tradeMessage: { marginTop: 10, fontSize: 12, color: 'var(--accent-strong)' },
   refreshToggle: { fontSize: 11.5, color: 'var(--text-muted)', alignSelf: 'flex-end', marginTop: -10 },
   footer: { fontSize: 11.5, color: 'var(--text-muted)', lineHeight: 1.6, marginTop: 8, borderTop: '1px solid var(--gridline)', paddingTop: 14 },

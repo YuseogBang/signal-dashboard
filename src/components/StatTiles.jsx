@@ -144,7 +144,8 @@ const styles = {
   },
   heroTone: (tone) => ({
     background:
-      tone === 'good' ? 'var(--status-good-bg)' : tone === 'critical' ? 'var(--status-critical-bg)' : tone === 'warning' ? 'var(--status-warning-bg)' : 'var(--surface-card)',
+      tone === 'good' ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.34), rgba(18, 54, 59, 0.96) 68%)' : tone === 'critical' ? 'linear-gradient(135deg, rgba(37, 99, 235, 0.40), rgba(24, 35, 64, 0.96) 68%)' : tone === 'warning' ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.24), rgba(49, 44, 29, 0.96) 68%)' : 'var(--surface-card)',
+    boxShadow: tone ? 'inset 0 1px 0 rgba(255,255,255,0.12)' : 'none',
   }),
   heroTop: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 8 },
   heroValue: { fontSize: 28, fontWeight: 800, lineHeight: 1.15 },
