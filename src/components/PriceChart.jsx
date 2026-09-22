@@ -36,15 +36,29 @@ function toneColor(tone) {
   return 'var(--text-primary)';
 }
 
+function signalGroup(label) {
+  if (label === 'BUY' || label === 'STRONG_BUY') return 'BUY';
+  if (label === 'SELL' || label === 'STRONG_SELL') return 'SELL';
+  return 'OTHER';
+}
+
 export default function PriceChart({ data, currency }) {
   // 모든 시리즈가 같은 배열/카테고리 축을 공유하도록 buy/sell 마커 값을
   // 별도 data 배열이 아니라 같은 행에 필드로 얹는다 (recharts가 계열마다
   // 다른 data 배열을 받으면 카테고리 축 정렬이 어긋나는 문제를 피하기 위함).
-  const chartData = data.map((d) => ({
-    ...d,
-    buyY: d.signalLabel === 'BUY' || d.signalLabel === 'STRONG_BUY' ? d.close : null,
-    sellY: d.signalLabel === 'SELL' || d.signalLabel === 'STRONG_SELL' ? d.close : null,
-  }));
+  //
+  // 마커는 조건이 유지되는 모든 날이 아니라 "상태가 전환된 시점"에만 찍는다 —
+  // 매일 찍으면 추세 구간에서 마커가 겹쳐 잡음처럼 보이고, 실제 매매 관점에서도
+  // 의미 있는 지점은 전환 시점 하나뿐이기 때문이다.
+  const chartData = data.map((d, i) => {
+    const group = signalGroup(d.signalLabel);
+    const prevGroup = i > 0 ? signalGroup(data[i - 1].signalLabel) : null;
+    return {
+      ...d,
+      buyY: group === 'BUY' && prevGroup !== 'BUY' ? d.close : null,
+      sellY: group === 'SELL' && prevGroup !== 'SELL' ? d.close : null,
+    };
+  });
 
   return (
     <div style={{ width: '100%', height: 320 }}>

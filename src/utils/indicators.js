@@ -105,28 +105,173 @@ function clip(v, lo, hi) {
 }
 
 /**
+ * ATR (Average True Range) — Wilder's smoothing. 변동성을 가격 단위로 표현.
+ * highs/lows/closes는 동일 길이, 날짜 오름차순.
+ */
+export function atr(highs, lows, closes, period = 14) {
+  const n = closes.length;
+  const out = new Array(n).fill(null);
+  if (n <= period) return out;
+
+  const tr = new Array(n).fill(null);
+  for (let i = 1; i < n; i++) {
+    const hl = highs[i] - lows[i];
+    const hc = Math.abs(highs[i] - closes[i - 1]);
+    const lc = Math.abs(lows[i] - closes[i - 1]);
+    tr[i] = Math.max(hl, hc, lc);
+  }
+
+  let sum = 0;
+  for (let i = 1; i <= period; i++) sum += tr[i];
+  let prev = sum / period;
+  out[period] = prev;
+  for (let i = period + 1; i < n; i++) {
+    prev = (prev * (period - 1) + tr[i]) / period;
+    out[i] = prev;
+  }
+  return out;
+}
+
+/**
+ * ADX (Average Directional Index) — Wilder 방식. 추세 "방향"이 아니라 추세 "강도"를 0~100으로 나타냄.
+ * 관례상 25 이상이면 뚜렷한 추세, 20 미만이면 횡보(레인지)로 본다.
+ * +DI/-DI까지는 계산하지 않고 ADX 값만 반환한다 (강도 판단에는 이 값만으로 충분).
+ */
+export function adx(highs, lows, closes, period = 14) {
+  const n = closes.length;
+  const out = new Array(n).fill(null);
+  if (n <= period * 2) return out;
+
+  const plusDM = new Array(n).fill(0);
+  const minusDM = new Array(n).fill(0);
+  const tr = new Array(n).fill(0);
+
+  for (let i = 1; i < n; i++) {
+    const upMove = highs[i] - highs[i - 1];
+    const downMove = lows[i - 1] - lows[i];
+    plusDM[i] = upMove > downMove && upMove > 0 ? upMove : 0;
+    minusDM[i] = downMove > upMove && downMove > 0 ? downMove : 0;
+    const hl = highs[i] - lows[i];
+    const hc = Math.abs(highs[i] - closes[i - 1]);
+    const lc = Math.abs(lows[i] - closes[i - 1]);
+    tr[i] = Math.max(hl, hc, lc);
+  }
+
+  let smTr = 0;
+  let smPlus = 0;
+  let smMinus = 0;
+  for (let i = 1; i <= period; i++) {
+    smTr += tr[i];
+    smPlus += plusDM[i];
+    smMinus += minusDM[i];
+  }
+
+  const dx = new Array(n).fill(null);
+  const diAt = (pSum, mSum, trSum) => {
+    const pDI = trSum > 0 ? (pSum / trSum) * 100 : 0;
+    const mDI = trSum > 0 ? (mSum / trSum) * 100 : 0;
+    const denom = pDI + mDI;
+    return denom > 0 ? (Math.abs(pDI - mDI) / denom) * 100 : 0;
+  };
+  dx[period] = diAt(smPlus, smMinus, smTr);
+
+  for (let i = period + 1; i < n; i++) {
+    smTr = smTr - smTr / period + tr[i];
+    smPlus = smPlus - smPlus / period + plusDM[i];
+    smMinus = smMinus - smMinus / period + minusDM[i];
+    dx[i] = diAt(smPlus, smMinus, smTr);
+  }
+
+  let dxSum = 0;
+  for (let i = period; i < period * 2; i++) dxSum += dx[i];
+  let adxPrev = dxSum / period;
+  out[period * 2 - 1] = adxPrev;
+  for (let i = period * 2; i < n; i++) {
+    adxPrev = (adxPrev * (period - 1) + dx[i]) / period;
+    out[i] = adxPrev;
+  }
+  return out;
+}
+
+/**
+ * 추세 상태 분류 — 단기(fast)/중기(slow) 단순이동평균의 괴리율로 상승/하락/횡보 판정.
+ * RSI/MACD와 독립적인 축으로, "지금이 추세장인지 레인지장인지"를 알려준다.
+ */
+export function trendState(closes, fastPeriod = 20, slowPeriod = 50) {
+  const fast = sma(closes, fastPeriod);
+  const slow = sma(closes, slowPeriod);
+  return closes.map((_, i) => {
+    if (fast[i] == null || slow[i] == null) return null;
+    const diff = (fast[i] - slow[i]) / slow[i];
+    if (diff > 0.005) return 'UP';
+    if (diff < -0.005) return 'DOWN';
+    return 'FLAT';
+  });
+}
+
+/** 상대 거래량 = 당일 거래량 / 최근 period일 평균 거래량. 1.2 이상이면 평소보다 뚜렷한 거래량으로 취급. */
+export function relativeVolume(volumes, period = 20) {
+  const avg = sma(volumes, period);
+  return volumes.map((v, i) => (avg[i] ? v / avg[i] : null));
+}
+
+/**
  * 복합 시그널 스코어 계산
  * RSI와 MACD 히스토그램을 각각 -1~1 범위로 정규화한 뒤 가중 평균한다.
  *  - RSI: 30 이하 과매도(매수 우위) → +1에 가깝게, 70 이상 과매수(매도 우위) → -1에 가깝게
  *  - MACD 히스토그램: 최근 20일 평균 절대값 대비 상대적 크기로 정규화 (모멘텀 강도)
- * weights: { rsi, macd } 합이 1이 되지 않아도 내부적으로 정규화됨
+ *
+ * weights를 명시하면 고정 가중치를 쓰고, 생략하면(기본값) ADX 기반 동적 가중치를 사용한다:
+ * ADX>=25(뚜렷한 추세)면 추세추종 지표인 MACD 비중을 높이고, ADX<20(횡보)이면 평균회귀
+ * 지표인 RSI 비중을 높인다. high/low/volume이 주어지면 ADX/ATR/추세/거래량 확인도 함께 계산한다.
  */
-export function compositeSignal(closes, { rsiPeriod = 14, macdParams = [12, 26, 9], weights = { rsi: 0.5, macd: 0.5 }, histWindow = 20 } = {}) {
+export function compositeSignal(
+  closes,
+  {
+    rsiPeriod = 14,
+    macdParams = [12, 26, 9],
+    weights = null,
+    histWindow = 20,
+    highs = null,
+    lows = null,
+    volumes = null,
+    adxPeriod = 14,
+    trendFast = 20,
+    trendSlow = 50,
+    volWindow = 20,
+  } = {}
+) {
   const rsiArr = rsi(closes, rsiPeriod);
   const { macdLine, signalLine, histogram } = macd(closes, ...macdParams);
 
-  const wSum = weights.rsi + weights.macd;
-  const wRsi = weights.rsi / wSum;
-  const wMacd = weights.macd / wSum;
+  const hasOHLC = Array.isArray(highs) && Array.isArray(lows) && highs.length === closes.length && lows.length === closes.length;
+  const adxArr = hasOHLC ? adx(highs, lows, closes, adxPeriod) : new Array(closes.length).fill(null);
+  const atrArr = hasOHLC ? atr(highs, lows, closes, adxPeriod) : new Array(closes.length).fill(null);
+  const trendArr = trendState(closes, trendFast, trendSlow);
+  const relVolArr =
+    Array.isArray(volumes) && volumes.length === closes.length ? relativeVolume(volumes, volWindow) : new Array(closes.length).fill(null);
+
+  let fixedWRsi = null;
+  let fixedWMacd = null;
+  if (weights) {
+    const wSum = weights.rsi + weights.macd;
+    fixedWRsi = weights.rsi / wSum;
+    fixedWMacd = weights.macd / wSum;
+  }
 
   const scores = closes.map((_, i) => {
     const r = rsiArr[i];
     const h = histogram[i];
-    if (r == null || h == null) return { score: null, label: null, rsi: r, histogram: h };
+    const base = {
+      adx: adxArr[i],
+      atr: atrArr[i],
+      trend: trendArr[i],
+      relVolume: relVolArr[i],
+    };
+    if (r == null || h == null) return { score: null, label: null, rsi: r, histogram: h, ...base };
 
     const rsiScore = clip((50 - r) / 50, -1, 1);
 
-    // 최근 histWindow 구간의 평균 절대 히스토그램 값으로 정규화
     const start = Math.max(0, i - histWindow + 1);
     let sum = 0;
     let count = 0;
@@ -139,6 +284,21 @@ export function compositeSignal(closes, { rsiPeriod = 14, macdParams = [12, 26, 
     const avgAbs = count > 0 ? sum / count : 0;
     const macdScore = avgAbs > 0 ? clip(h / (avgAbs * 1.5), -1, 1) : 0;
 
+    let wRsi = 0.5;
+    let wMacd = 0.5;
+    if (fixedWRsi != null) {
+      wRsi = fixedWRsi;
+      wMacd = fixedWMacd;
+    } else if (adxArr[i] != null) {
+      if (adxArr[i] >= 25) {
+        wRsi = 0.35;
+        wMacd = 0.65;
+      } else if (adxArr[i] < 20) {
+        wRsi = 0.65;
+        wMacd = 0.35;
+      }
+    }
+
     const score = wRsi * rsiScore + wMacd * macdScore;
 
     let label = 'HOLD';
@@ -147,10 +307,108 @@ export function compositeSignal(closes, { rsiPeriod = 14, macdParams = [12, 26, 
     else if (score < -0.5) label = 'STRONG_SELL';
     else if (score < -0.15) label = 'SELL';
 
-    return { score, label, rsi: r, histogram: h };
+    const relVol = relVolArr[i];
+    const isDirectional = label === 'BUY' || label === 'STRONG_BUY' || label === 'SELL' || label === 'STRONG_SELL';
+    const volumeConfirmed = relVol != null && isDirectional ? relVol >= 1.2 : null;
+
+    return {
+      score,
+      label,
+      rsi: r,
+      histogram: h,
+      ...base,
+      volumeConfirmed,
+      weightRsi: wRsi,
+      weightMacd: wMacd,
+    };
   });
 
-  return { rsi: rsiArr, macdLine, signalLine, histogram, composite: scores };
+  return {
+    rsi: rsiArr,
+    macdLine,
+    signalLine,
+    histogram,
+    adx: adxArr,
+    atr: atrArr,
+    trend: trendArr,
+    relVolume: relVolArr,
+    composite: scores,
+  };
+}
+
+export const TREND_META = {
+  UP: { text: '상승 추세', tone: 'good' },
+  DOWN: { text: '하락 추세', tone: 'critical' },
+  FLAT: { text: '횡보', tone: 'warning' },
+};
+
+/**
+ * 시그널 기반의 단순 롱-온리 백테스트.
+ * BUY/STRONG_BUY에서 매수(전량), SELL/STRONG_SELL에서 청산(현금 보유), HOLD는 직전 포지션 유지.
+ * 거래비용·슬리피지·분할매매는 반영하지 않으며, 이 앱이 산출한 시그널을 그대로 따랐을 때의
+ * 참고용 결과다 (과최적화·생존 편향 등 실사용 전 반드시 별도 검증 필요).
+ */
+export function runBacktest(rows) {
+  let position = 0; // 0 = 현금, 1 = 매수 보유
+  let equity = 1;
+  let buyHoldEquity = 1;
+  const firstClose = rows[0]?.close ?? null;
+  const curve = [];
+  let peak = 1;
+  let maxDrawdown = 0;
+  const trades = [];
+  let currentTrade = null;
+
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    const prevClose = i > 0 ? rows[i - 1].close : r.close;
+    const dailyReturn = prevClose ? r.close / prevClose - 1 : 0;
+
+    if (position === 1) equity *= 1 + dailyReturn;
+    if (firstClose) buyHoldEquity = r.close / firstClose;
+
+    peak = Math.max(peak, equity);
+    maxDrawdown = Math.min(maxDrawdown, equity / peak - 1);
+    curve.push({ date: r.date, strategy: equity, buyHold: buyHoldEquity });
+
+    const label = r.signalLabel;
+    if (position === 0 && (label === 'BUY' || label === 'STRONG_BUY')) {
+      position = 1;
+      currentTrade = { entryDate: r.date, entryPrice: r.close };
+    } else if (position === 1 && (label === 'SELL' || label === 'STRONG_SELL')) {
+      position = 0;
+      if (currentTrade) {
+        trades.push({ ...currentTrade, exitDate: r.date, exitPrice: r.close, return: r.close / currentTrade.entryPrice - 1 });
+        currentTrade = null;
+      }
+    }
+  }
+
+  if (currentTrade) {
+    const last = rows[rows.length - 1];
+    trades.push({
+      ...currentTrade,
+      exitDate: last.date,
+      exitPrice: last.close,
+      return: last.close / currentTrade.entryPrice - 1,
+      open: true,
+    });
+  }
+
+  const wins = trades.filter((t) => t.return > 0).length;
+  const winRate = trades.length > 0 ? wins / trades.length : null;
+
+  return {
+    curve,
+    stats: {
+      totalReturn: equity - 1,
+      buyHoldReturn: buyHoldEquity - 1,
+      maxDrawdown,
+      winRate,
+      tradeCount: trades.length,
+    },
+    trades,
+  };
 }
 
 export const SIGNAL_META = {

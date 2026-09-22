@@ -48,6 +48,19 @@ export function formatPercentAbs(fraction) {
   return percentFormatter.format(Math.abs(fraction));
 }
 
+const percentSignedFormatter = new Intl.NumberFormat('ko-KR', {
+  style: 'percent',
+  minimumFractionDigits: 1,
+  maximumFractionDigits: 1,
+  signDisplay: 'exceptZero',
+});
+
+/** 부호를 포함한 퍼센트 표기 (예: +12.3%, -4.5%). 수익률처럼 방향이 의미 있는 값에 사용. */
+export function formatPercentSigned(fraction) {
+  if (fraction == null || Number.isNaN(fraction)) return '—';
+  return percentSignedFormatter.format(fraction);
+}
+
 const decimal1 = new Intl.NumberFormat('ko-KR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 const decimal2 = new Intl.NumberFormat('ko-KR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 

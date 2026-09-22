@@ -4,8 +4,10 @@ import StatTiles from './components/StatTiles';
 import PriceChart from './components/PriceChart';
 import IndicatorPanel from './components/IndicatorPanel';
 import DataTable from './components/DataTable';
+import RiskPanel from './components/RiskPanel';
+import BacktestPanel from './components/BacktestPanel';
 import { getSampleData, SAMPLE_TICKERS } from './data/sampleData';
-import { compositeSignal } from './utils/indicators';
+import { compositeSignal, runBacktest } from './utils/indicators';
 import { parseCsvFile } from './utils/csv';
 import { fetchTossCandles } from './utils/tossApi';
 
@@ -70,17 +72,34 @@ export default function App() {
   const enriched = useMemo(() => {
     if (!rawData?.length) return [];
     const closes = rawData.map((d) => d.close);
-    const result = compositeSignal(closes);
+    const highs = rawData.map((d) => d.high ?? d.close);
+    const lows = rawData.map((d) => d.low ?? d.close);
+    const volumes = rawData.map((d) => d.volume ?? null);
+    const hasVolumes = volumes.every((v) => v != null);
+    const result = compositeSignal(closes, { highs, lows, volumes: hasVolumes ? volumes : null });
     return rawData.map((d, i) => ({
       ...d,
       rsi: result.rsi[i],
       macdLine: result.macdLine[i],
       signalLine: result.signalLine[i],
       histogram: result.histogram[i],
+      adx: result.composite[i].adx,
+      atr: result.composite[i].atr,
+      trend: result.composite[i].trend,
+      relVolume: result.composite[i].relVolume,
+      volumeConfirmed: result.composite[i].volumeConfirmed,
+      weightRsi: result.composite[i].weightRsi,
+      weightMacd: result.composite[i].weightMacd,
       signalScore: result.composite[i].score,
       signalLabel: result.composite[i].label,
     }));
   }, [rawData]);
+
+  const backtest = useMemo(() => {
+    const usable = enriched.filter((r) => r.signalLabel != null);
+    if (usable.length < 10) return null;
+    return runBacktest(usable);
+  }, [enriched]);
 
   const last = enriched.at(-1);
   const prev = enriched.at(-2);
@@ -95,7 +114,7 @@ export default function App() {
           <div>
             <h1 style={styles.title}>투자 시그널 대시보드</h1>
             <p style={styles.subtitle}>
-              RSI · MACD 기반 매수/매도 시그널 분석 — {label}
+              RSI·MACD·ADX 기반 매수/매도 시그널 분석 — {label}
               {source.type === 'sample' && <span style={styles.demoTag}>샘플(시뮬레이션) 데이터</span>}
               {source.type === 'live' && <span style={styles.liveTag}>실시간 시세 · 토스증권 Open API</span>}
             </p>
@@ -122,6 +141,13 @@ export default function App() {
                 rsi={last?.rsi}
                 histogram={last?.histogram}
                 signalLabel={last?.signalLabel}
+                signalScore={last?.signalScore}
+                adx={last?.adx}
+                trend={last?.trend}
+                relVolume={last?.relVolume}
+                volumeConfirmed={last?.volumeConfirmed}
+                weightRsi={last?.weightRsi}
+                weightMacd={last?.weightMacd}
               />
 
               <div style={styles.card}>
@@ -131,6 +157,16 @@ export default function App() {
               <div style={styles.card}>
                 <IndicatorPanel data={enriched} />
               </div>
+
+              <div style={styles.card}>
+                <RiskPanel last={last} currency={currency} />
+              </div>
+
+              {backtest && (
+                <div style={styles.card}>
+                  <BacktestPanel backtest={backtest} />
+                </div>
+              )}
 
               <div style={styles.tableHeader}>
                 <h2 style={{ margin: 0, fontSize: 14, color: 'var(--text-secondary)' }}>일별 데이터 &amp; 시그널</h2>
@@ -149,10 +185,12 @@ export default function App() {
         </main>
 
         <footer style={styles.footer}>
-          방법론: RSI(14) 과매수/과매도 정규화 점수와 MACD(12,26,9) 히스토그램 모멘텀 점수를 가중 평균한 복합
-          스코어로 매수/매도/관망 시그널을 산출합니다. 샘플 데이터는 실제 시세가 아닌 시뮬레이션이며, 실사용 시
-          CSV 업로드 또는 실시간 조회(토스증권 Open API) 기능으로 실제 시세 데이터를 넣어 분석하세요. 본 도구는
-          투자 참고용이며 투자 권유가 아닙니다.
+          방법론: RSI(14) 과매수/과매도 점수와 MACD(12,26,9) 히스토그램 모멘텀 점수를 ADX(14) 기반으로
+          동적 가중 평균한 복합 스코어로 매수/매도/관망 시그널을 산출합니다 (추세 강한 구간은 MACD 비중↑,
+          횡보 구간은 RSI 비중↑). 거래량·ATR 변동성·추세 상태는 참고 지표로 함께 표시되며 스코어 계산에는
+          직접 반영되지 않습니다. 샘플 데이터는 실제 시세가 아닌 시뮬레이션이며, 실사용 시 CSV 업로드 또는
+          실시간 조회(토스증권 Open API) 기능으로 실제 시세 데이터를 넣어 분석하세요. 본 도구는 투자 참고용이며
+          투자 권유가 아닙니다.
         </footer>
       </div>
     </>
@@ -191,7 +229,7 @@ const styles = {
   card: {
     background: 'var(--surface-card)',
     border: '1px solid var(--border)',
-    borderRadius: 12,
+    borderRadius: 6,
     padding: '16px 16px 8px',
   },
   tableHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 },

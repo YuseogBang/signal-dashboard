@@ -112,7 +112,7 @@ const styles = {
     padding: '16px 20px',
     background: 'var(--surface-card)',
     border: '1px solid var(--border)',
-    borderRadius: 12,
+    borderRadius: 6,
   },
   group: { display: 'flex', flexDirection: 'column', gap: 6, minWidth: 220, maxWidth: 320 },
   label: { fontSize: 12, color: 'var(--text-muted)', fontWeight: 600, letterSpacing: 0.2 },

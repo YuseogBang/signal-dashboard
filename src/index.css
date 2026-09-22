@@ -59,6 +59,14 @@ input {
   font-variant-numeric: tabular-nums;
 }
 
+/* 가격/지표 등 실제 수치 데이터 전용 — 라벨/문장은 Inter 그대로 두고 숫자만
+   모노스페이스로 분리해 트레이딩 터미널에 가까운 밀도/톤을 준다. */
+.mono-num {
+  font-family: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
 .truncate {
   overflow: hidden;
   text-overflow: ellipsis;

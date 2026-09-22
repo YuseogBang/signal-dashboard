@@ -5,7 +5,7 @@ export default function DataTable({ data, currency }) {
   const rows = [...data].reverse().slice(0, 60); // 최신순, 최대 60행 표시
 
   return (
-    <div style={{ overflowX: 'auto', maxHeight: 420, border: '1px solid var(--border)', borderRadius: 12 }}>
+    <div style={{ overflowX: 'auto', maxHeight: 420, border: '1px solid var(--border)', borderRadius: 6 }}>
       <table style={styles.table}>
         <caption style={styles.caption}>일별 종가, RSI, MACD 히스토그램 및 종합 시그널 (최신 60거래일)</caption>
         <thead>
