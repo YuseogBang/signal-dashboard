@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import ControlPanel from './components/ControlPanel';
 import StatTiles from './components/StatTiles';
 import PriceChart from './components/PriceChart';
@@ -6,19 +6,21 @@ import IndicatorPanel from './components/IndicatorPanel';
 import DataTable from './components/DataTable';
 import RiskPanel from './components/RiskPanel';
 import BacktestPanel from './components/BacktestPanel';
+import TimingPanel from './components/TimingPanel';
 import { getSampleData, SAMPLE_TICKERS } from './data/sampleData';
 import { compositeSignal, runBacktest } from './utils/indicators';
 import { parseCsvFile } from './utils/csv';
 import { fetchTossCandles } from './utils/tossApi';
 
 const DEFAULT_TICKER = SAMPLE_TICKERS[0].id;
+const DEFAULT_LIVE_SYMBOL = '005930';
 
 export default function App() {
   const [source, setSource] = useState({ type: 'sample', id: DEFAULT_TICKER });
   const [rawData, setRawData] = useState(() => getSampleData(DEFAULT_TICKER));
   const [uploadedName, setUploadedName] = useState('');
   const [liveCurrency, setLiveCurrency] = useState('KRW');
-  const [liveLoading, setLiveLoading] = useState(false);
+  const [liveLoading, setLiveLoading] = useState(true);
   const [error, setError] = useState('');
   const [showTable, setShowTable] = useState(false);
 
@@ -54,7 +56,7 @@ export default function App() {
     }
   }
 
-  async function handleLiveLookup(symbol) {
+  async function handleLiveLookup(symbol, { fallbackToSample = false } = {}) {
     setError('');
     setLiveLoading(true);
     try {
@@ -63,11 +65,21 @@ export default function App() {
       setLiveCurrency(cur);
       setSource({ type: 'live', id: symbol.toUpperCase() });
     } catch (e) {
-      setError(e.message || '실시간 데이터를 불러오지 못했습니다.');
+      if (fallbackToSample) {
+        setSource({ type: 'sample', id: DEFAULT_TICKER });
+        setRawData(getSampleData(DEFAULT_TICKER));
+        setError('실시간 조회에 실패해 샘플 데이터를 표시하고 있습니다.');
+      } else {
+        setError(e.message || '실시간 데이터를 불러오지 못했습니다.');
+      }
     } finally {
       setLiveLoading(false);
     }
   }
+
+  useEffect(() => {
+    void handleLiveLookup(DEFAULT_LIVE_SYMBOL, { fallbackToSample: true });
+  }, []);
 
   const enriched = useMemo(() => {
     if (!rawData?.length) return [];
@@ -92,6 +104,7 @@ export default function App() {
       weightMacd: result.composite[i].weightMacd,
       signalScore: result.composite[i].score,
       signalLabel: result.composite[i].label,
+      timing: result.composite[i].timing,
     }));
   }, [rawData]);
 
@@ -130,6 +143,7 @@ export default function App() {
             error={error}
             onLiveLookup={handleLiveLookup}
             liveLoading={liveLoading}
+            defaultLiveSymbol={DEFAULT_LIVE_SYMBOL}
           />
 
           {enriched.length > 0 && (
@@ -149,6 +163,10 @@ export default function App() {
                 weightRsi={last?.weightRsi}
                 weightMacd={last?.weightMacd}
               />
+
+              <div style={styles.card}>
+                <TimingPanel last={last} currency={currency} />
+              </div>
 
               <div style={styles.card}>
                 <PriceChart data={enriched} currency={currency} />

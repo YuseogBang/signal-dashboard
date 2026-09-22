@@ -9,9 +9,10 @@ export default function ControlPanel({
   error,
   onLiveLookup,
   liveLoading,
+  defaultLiveSymbol,
 }) {
   const fileRef = useRef(null);
-  const [symbolInput, setSymbolInput] = useState('');
+  const [symbolInput, setSymbolInput] = useState(defaultLiveSymbol);
 
   function submitLiveLookup(e) {
     e.preventDefault();
@@ -22,6 +23,30 @@ export default function ControlPanel({
 
   return (
     <div style={styles.wrap}>
+      {onLiveLookup && (
+        <form style={styles.group} onSubmit={submitLiveLookup}>
+          <label htmlFor="live-symbol" style={styles.label}>
+            실시간 조회 (토스증권 Open API)
+          </label>
+          <div style={styles.uploadRow}>
+            <input
+              id="live-symbol"
+              className="ctrl"
+              style={styles.symbolInput}
+              type="text"
+              placeholder="예: 005930, AAPL"
+              value={symbolInput}
+              onChange={(e) => setSymbolInput(e.target.value)}
+              autoComplete="off"
+            />
+            <button type="submit" className="ctrl" disabled={liveLoading || !symbolInput.trim()}>
+              {liveLoading ? '조회 중…' : '조회'}
+            </button>
+          </div>
+          <span style={styles.hint}>먼저 실시간 데이터를 시도하고, 실패하면 샘플 데이터로 전환합니다.</span>
+        </form>
+      )}
+
       <div style={styles.group}>
         <label htmlFor="ticker-select" style={styles.label}>
           샘플 종목
@@ -70,30 +95,6 @@ export default function ControlPanel({
         </div>
         <span style={styles.hint}>필요 컬럼: date, close (open/high/low/volume 선택)</span>
       </div>
-
-      {onLiveLookup && (
-        <form style={styles.group} onSubmit={submitLiveLookup}>
-          <label htmlFor="live-symbol" style={styles.label}>
-            또는 실시간 조회 (토스증권 Open API)
-          </label>
-          <div style={styles.uploadRow}>
-            <input
-              id="live-symbol"
-              className="ctrl"
-              style={styles.symbolInput}
-              type="text"
-              placeholder="예: 005930, AAPL"
-              value={symbolInput}
-              onChange={(e) => setSymbolInput(e.target.value)}
-              autoComplete="off"
-            />
-            <button type="submit" className="ctrl" disabled={liveLoading || !symbolInput.trim()}>
-              {liveLoading ? '조회 중…' : '조회'}
-            </button>
-          </div>
-          <span style={styles.hint}>KRX 6자리 코드 또는 미국 티커. 서버에 API 키가 설정되어 있어야 합니다.</span>
-        </form>
-      )}
 
       {error && (
         <div role="alert" aria-live="polite" style={styles.error}>

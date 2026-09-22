@@ -215,6 +215,122 @@ export function relativeVolume(volumes, period = 20) {
   return volumes.map((v, i) => (avg[i] ? v / avg[i] : null));
 }
 
+/** 볼린저 밴드 — 가격의 평균 회귀 위치와 변동성 압축을 함께 판단한다. */
+export function bollingerBands(closes, period = 20, multiplier = 2) {
+  const middle = sma(closes, period);
+  const upper = new Array(closes.length).fill(null);
+  const lower = new Array(closes.length).fill(null);
+  const percentB = new Array(closes.length).fill(null);
+  const bandwidth = new Array(closes.length).fill(null);
+
+  for (let i = period - 1; i < closes.length; i++) {
+    const mean = middle[i];
+    let variance = 0;
+    for (let j = i - period + 1; j <= i; j++) variance += (closes[j] - mean) ** 2;
+    const deviation = Math.sqrt(variance / period);
+    upper[i] = mean + multiplier * deviation;
+    lower[i] = mean - multiplier * deviation;
+    const width = upper[i] - lower[i];
+    percentB[i] = width > 0 ? (closes[i] - lower[i]) / width : 0.5;
+    bandwidth[i] = mean !== 0 ? width / mean : null;
+  }
+
+  return { middle, upper, lower, percentB, bandwidth };
+}
+
+/** 스토캐스틱 — 최근 고저 범위에서 현재 종가의 위치와 %K/%D 교차를 계산한다. */
+export function stochastic(highs, lows, closes, period = 14, signalPeriod = 3) {
+  const k = new Array(closes.length).fill(null);
+  for (let i = period - 1; i < closes.length; i++) {
+    const windowHigh = Math.max(...highs.slice(i - period + 1, i + 1));
+    const windowLow = Math.min(...lows.slice(i - period + 1, i + 1));
+    const range = windowHigh - windowLow;
+    k[i] = range > 0 ? ((closes[i] - windowLow) / range) * 100 : 50;
+  }
+
+  const d = new Array(closes.length).fill(null);
+  for (let i = period - 1 + signalPeriod - 1; i < closes.length; i++) {
+    const values = k.slice(i - signalPeriod + 1, i + 1).filter((value) => value != null);
+    if (values.length === signalPeriod) d[i] = values.reduce((sum, value) => sum + value, 0) / signalPeriod;
+  }
+  return { k, d };
+}
+
+/** 매수·매도 타이밍을 위한 EMA 정렬과 최근 지지/저항 구간. */
+export function timingContext(highs, lows, closes, volumes, { fastPeriod = 20, slowPeriod = 50, rangePeriod = 20 } = {}) {
+  const emaFast = ema(closes, fastPeriod);
+  const emaSlow = ema(closes, slowPeriod);
+  const bands = bollingerBands(closes, rangePeriod);
+  const stochasticValues = stochastic(highs, lows, closes);
+  const rsiValues = rsi(closes);
+  const relVolume = relativeVolume(volumes, rangePeriod);
+  const support = new Array(closes.length).fill(null);
+  const resistance = new Array(closes.length).fill(null);
+
+  for (let i = rangePeriod - 1; i < closes.length; i++) {
+    support[i] = Math.min(...lows.slice(i - rangePeriod + 1, i + 1));
+    resistance[i] = Math.max(...highs.slice(i - rangePeriod + 1, i + 1));
+  }
+
+  const timing = closes.map((close, i) => {
+    if (emaFast[i] == null || emaSlow[i] == null || bands.percentB[i] == null || stochasticValues.d[i] == null) {
+      return {
+        emaFast: emaFast[i], emaSlow: emaSlow[i], percentB: bands.percentB[i], bandwidth: bands.bandwidth[i],
+        stochK: stochasticValues.k[i], stochD: stochasticValues.d[i], support: support[i], resistance: resistance[i],
+        timingScore: null, timingLabel: 'WAIT', buyPoints: 0, sellPoints: 0, confirmations: [], warnings: [],
+      };
+    }
+
+    const prevK = stochasticValues.k[i - 1];
+    const prevD = stochasticValues.d[i - 1];
+    const goldenCross = prevK != null && prevD != null && prevK <= prevD && stochasticValues.k[i] > stochasticValues.d[i];
+    const deadCross = prevK != null && prevD != null && prevK >= prevD && stochasticValues.k[i] < stochasticValues.d[i];
+    const trendUp = emaFast[i] > emaSlow[i] && close > emaFast[i];
+    const trendDown = emaFast[i] < emaSlow[i] && close < emaFast[i];
+    const nearSupport = support[i] > 0 && (close - support[i]) / close <= 0.025;
+    const nearResistance = resistance[i] > 0 && (resistance[i] - close) / close <= 0.025;
+    const buyPoints = [
+      trendUp,
+      rsiValues[i] != null && rsiValues[i] <= 35,
+      goldenCross && stochasticValues.k[i] < 45,
+      bands.percentB[i] <= 0.2,
+      nearSupport,
+      relVolume[i] != null && relVolume[i] >= 1.2,
+    ].filter(Boolean).length;
+    const sellPoints = [
+      trendDown,
+      deadCross && stochasticValues.k[i] > 55,
+      bands.percentB[i] >= 0.8,
+      nearResistance,
+      relVolume[i] != null && relVolume[i] >= 1.2,
+    ].filter(Boolean).length;
+    const confirmations = [];
+    if (trendUp) confirmations.push('EMA 상승 정렬');
+    if (trendDown) confirmations.push('EMA 하락 정렬');
+    if (goldenCross && stochasticValues.k[i] < 45) confirmations.push('스토캐스틱 골든크로스');
+    if (deadCross && stochasticValues.k[i] > 55) confirmations.push('스토캐스틱 데드크로스');
+    if (bands.percentB[i] <= 0.2) confirmations.push('볼린저 하단 근접');
+    if (bands.percentB[i] >= 0.8) confirmations.push('볼린저 상단 근접');
+    if (nearSupport) confirmations.push('지지선 근접');
+    if (nearResistance) confirmations.push('저항선 근접');
+    if (relVolume[i] != null && relVolume[i] >= 1.2) confirmations.push('거래량 확인');
+
+    let timingLabel = 'WAIT';
+    if (buyPoints >= 4 && buyPoints > sellPoints) timingLabel = 'BUY_ZONE';
+    else if (sellPoints >= 3 && sellPoints > buyPoints) timingLabel = 'SELL_ZONE';
+    else if (buyPoints >= 2 && buyPoints > sellPoints) timingLabel = 'WATCH_BUY';
+    else if (sellPoints >= 2 && sellPoints > buyPoints) timingLabel = 'WATCH_SELL';
+
+    return {
+      emaFast: emaFast[i], emaSlow: emaSlow[i], percentB: bands.percentB[i], bandwidth: bands.bandwidth[i],
+      stochK: stochasticValues.k[i], stochD: stochasticValues.d[i], support: support[i], resistance: resistance[i],
+      timingScore: (buyPoints - sellPoints) / 6, timingLabel, buyPoints, sellPoints, confirmations, warnings: [],
+    };
+  });
+
+  return { ...bands, ...stochasticValues, emaFast, emaSlow, support, resistance, timing };
+}
+
 /**
  * 복합 시그널 스코어 계산
  * RSI와 MACD 히스토그램을 각각 -1~1 범위로 정규화한 뒤 가중 평균한다.
@@ -250,6 +366,9 @@ export function compositeSignal(
   const trendArr = trendState(closes, trendFast, trendSlow);
   const relVolArr =
     Array.isArray(volumes) && volumes.length === closes.length ? relativeVolume(volumes, volWindow) : new Array(closes.length).fill(null);
+  const timingArr = hasOHLC && Array.isArray(volumes) && volumes.length === closes.length
+    ? timingContext(highs, lows, closes, volumes).timing
+    : new Array(closes.length).fill(null).map(() => ({ timingScore: null, timingLabel: 'WAIT', buyPoints: 0, sellPoints: 0, confirmations: [], warnings: [] }));
 
   let fixedWRsi = null;
   let fixedWMacd = null;
@@ -267,6 +386,7 @@ export function compositeSignal(
       atr: atrArr[i],
       trend: trendArr[i],
       relVolume: relVolArr[i],
+      timing: timingArr[i],
     };
     if (r == null || h == null) return { score: null, label: null, rsi: r, histogram: h, ...base };
 
@@ -320,6 +440,7 @@ export function compositeSignal(
       volumeConfirmed,
       weightRsi: wRsi,
       weightMacd: wMacd,
+      timing: timingArr[i],
     };
   });
 
