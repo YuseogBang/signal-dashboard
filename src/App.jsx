@@ -8,9 +8,12 @@ import RiskPanel from './components/RiskPanel';
 import BacktestPanel from './components/BacktestPanel';
 import TimingPanel from './components/TimingPanel';
 import { getSampleData, SAMPLE_TICKERS } from './data/sampleData';
-import { compositeSignal, runBacktest } from './utils/indicators';
+import { compareStrategies, compositeSignal, runBacktest } from './utils/indicators';
 import { parseCsvFile } from './utils/csv';
 import { fetchTossCandles } from './utils/tossApi';
+import PaperTradingPanel from './components/PaperTradingPanel';
+import StrategyPanel from './components/StrategyPanel';
+import { executePaperOrder, getPortfolioSnapshot, loadPaperState, persistPaperState, resetPaperState, updatePositionPrice } from './utils/paperTrading';
 
 const DEFAULT_TICKER = SAMPLE_TICKERS[0].id;
 const DEFAULT_LIVE_SYMBOL = '005930';
@@ -23,6 +26,9 @@ export default function App() {
   const [liveLoading, setLiveLoading] = useState(true);
   const [error, setError] = useState('');
   const [showTable, setShowTable] = useState(false);
+  const [paper, setPaper] = useState(loadPaperState);
+  const [tradeMessage, setTradeMessage] = useState('');
+  const [autoRefresh, setAutoRefresh] = useState(false);
 
   const currency = useMemo(() => {
     if (source.type === 'sample') {
@@ -116,6 +122,45 @@ export default function App() {
 
   const last = enriched.at(-1);
   const prev = enriched.at(-2);
+  const paperSymbol = source.type === 'upload' ? uploadedName || 'CSV' : source.id;
+  const paperSnapshot = useMemo(() => getPortfolioSnapshot(paper, paperSymbol, last?.close), [paper, paperSymbol, last?.close]);
+  const strategies = useMemo(() => enriched.length > 10 ? compareStrategies(enriched) : [], [enriched]);
+
+  useEffect(() => {
+    persistPaperState(paper);
+  }, [paper]);
+
+  useEffect(() => {
+    if (last?.close && paper.positions?.[paperSymbol]) setPaper((current) => updatePositionPrice(current, paperSymbol, last.close));
+  }, [last?.close, paperSymbol]);
+
+  useEffect(() => {
+    if (!autoRefresh || source.type !== 'live') return undefined;
+    const timer = window.setInterval(() => { void handleLiveLookup(source.id); }, 60_000);
+    return () => window.clearInterval(timer);
+  }, [autoRefresh, source.type, source.id]);
+
+  function handlePaperOrder(order) {
+    const result = executePaperOrder(paper, order);
+    if (result.error) {
+      setTradeMessage(result.error);
+      return;
+    }
+    setPaper(result.state);
+    setTradeMessage(`${order.side === 'BUY' ? '매수' : '매도'} 기록이 저장되었습니다.`);
+  }
+
+  function handleJournal(entry) {
+    setPaper((current) => ({ ...current, journal: [{ id: `${Date.now()}-${Math.random()}`, timestamp: new Date().toISOString(), ...entry }, ...(current.journal ?? [])] }));
+    setTradeMessage('매매일지가 저장되었습니다.');
+  }
+
+  function handlePaperReset() {
+    if (window.confirm('모의계좌, 체결 기록, 매매일지를 모두 초기화할까요?')) {
+      setPaper(resetPaperState());
+      setTradeMessage('모의계좌가 초기화되었습니다.');
+    }
+  }
 
   return (
     <>
@@ -145,6 +190,7 @@ export default function App() {
             liveLoading={liveLoading}
             defaultLiveSymbol={DEFAULT_LIVE_SYMBOL}
           />
+          {source.type === 'live' && <label style={styles.refreshToggle}><input type="checkbox" checked={autoRefresh} onChange={(e) => setAutoRefresh(e.target.checked)} /> 1분마다 실시간 가격 자동 갱신</label>}
 
           {enriched.length > 0 && (
             <>
@@ -169,6 +215,20 @@ export default function App() {
               </div>
 
               <div style={styles.card}>
+                <PaperTradingPanel
+                  symbol={paperSymbol}
+                  currency={currency}
+                  last={last}
+                  paper={paper}
+                  snapshot={paperSnapshot}
+                  onOrder={handlePaperOrder}
+                  onJournal={handleJournal}
+                  onReset={handlePaperReset}
+                />
+                {tradeMessage && <div role="status" style={styles.tradeMessage}>{tradeMessage}</div>}
+              </div>
+
+              <div style={styles.card}>
                 <PriceChart data={enriched} currency={currency} />
               </div>
 
@@ -183,6 +243,12 @@ export default function App() {
               {backtest && (
                 <div style={styles.card}>
                   <BacktestPanel backtest={backtest} />
+                </div>
+              )}
+
+              {strategies.length > 0 && (
+                <div style={styles.card}>
+                  <StrategyPanel strategies={strategies} />
                 </div>
               )}
 
@@ -204,10 +270,9 @@ export default function App() {
 
         <footer style={styles.footer}>
           방법론: RSI(14) 과매수/과매도 점수와 MACD(12,26,9) 히스토그램 모멘텀 점수를 ADX(14) 기반으로
-          동적 가중 평균한 복합 스코어로 매수/매도/관망 시그널을 산출합니다 (추세 강한 구간은 MACD 비중↑,
-          횡보 구간은 RSI 비중↑). 거래량·ATR 변동성·추세 상태는 참고 지표로 함께 표시되며 스코어 계산에는
-          직접 반영되지 않습니다. 샘플 데이터는 실제 시세가 아닌 시뮬레이션이며, 실사용 시 CSV 업로드 또는
-          실시간 조회(토스증권 Open API) 기능으로 실제 시세 데이터를 넣어 분석하세요. 본 도구는 투자 참고용이며
+          동적 가중 평균한 복합 스코어와 EMA·볼린저·스토캐스틱·지지/저항·거래량 기반 타이밍 조건을 함께 표시합니다.
+          모의투자 워크스페이스는 실제 주문 없이 가상 체결·리스크 제한·매매일지·전략 비교를 제공하며, 모든 계산은
+          브라우저 안에서만 처리됩니다. 샘플 데이터는 실제 시세가 아닌 시뮬레이션이며, 본 도구는 투자 참고용이고
           투자 권유가 아닙니다.
         </footer>
       </div>
@@ -251,5 +316,7 @@ const styles = {
     padding: '16px 16px 8px',
   },
   tableHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 },
+  tradeMessage: { marginTop: 10, fontSize: 12, color: 'var(--accent-strong)' },
+  refreshToggle: { fontSize: 11.5, color: 'var(--text-muted)', alignSelf: 'flex-end', marginTop: -10 },
   footer: { fontSize: 11.5, color: 'var(--text-muted)', lineHeight: 1.6, marginTop: 8, borderTop: '1px solid var(--gridline)', paddingTop: 14 },
 };

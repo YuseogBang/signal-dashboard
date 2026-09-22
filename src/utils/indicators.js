@@ -532,6 +532,54 @@ export function runBacktest(rows) {
   };
 }
 
+function runRuleBacktest(rows, rule) {
+  let position = 0;
+  let equity = 1;
+  let peak = 1;
+  let maxDrawdown = 0;
+  let entry = null;
+  const trades = [];
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const prev = rows[i - 1]?.close ?? row.close;
+    if (position) equity *= prev ? row.close / prev : 1;
+    peak = Math.max(peak, equity);
+    maxDrawdown = Math.min(maxDrawdown, equity / peak - 1);
+    const action = rule(row, i, rows);
+    if (!position && action === 'BUY') { position = 1; entry = { entryDate: row.date, entryPrice: row.close }; }
+    else if (position && action === 'SELL') { position = 0; trades.push({ ...entry, exitDate: row.date, exitPrice: row.close, return: row.close / entry.entryPrice - 1 }); entry = null; }
+  }
+  if (entry) { const last = rows.at(-1); trades.push({ ...entry, exitDate: last.date, exitPrice: last.close, return: last.close / entry.entryPrice - 1, open: true }); }
+  return { totalReturn: equity - 1, maxDrawdown, winRate: trades.length ? trades.filter((t) => t.return > 0).length / trades.length : null, tradeCount: trades.length };
+}
+
+export function compareStrategies(rows) {
+  const buyHold = rows.length > 1 && rows[0].close ? rows.at(-1).close / rows[0].close - 1 : 0;
+  const buyHoldPeak = rows.reduce((state, row) => {
+    const value = rows[0]?.close ? row.close / rows[0].close : 1;
+    const peak = Math.max(state.peak, value);
+    return { peak, mdd: Math.min(state.mdd, value / peak - 1) };
+  }, { peak: 1, mdd: 0 });
+  const timing = runRuleBacktest(rows, (row) => {
+    if (row.timing?.timingLabel === 'BUY_ZONE' || row.timing?.timingLabel === 'WATCH_BUY') return 'BUY';
+    if (row.timing?.timingLabel === 'SELL_ZONE' || row.timing?.timingLabel === 'WATCH_SELL') return 'SELL';
+    return 'HOLD';
+  });
+  const trend = runRuleBacktest(rows, (row) => {
+    if (row.timing?.emaFast == null || row.timing?.emaSlow == null) return 'HOLD';
+    if (row.timing.emaFast > row.timing.emaSlow && (row.trend === 'UP' || row.signalLabel === 'BUY' || row.signalLabel === 'STRONG_BUY')) return 'BUY';
+    if (row.timing.emaFast < row.timing.emaSlow && (row.trend === 'DOWN' || row.signalLabel === 'SELL' || row.signalLabel === 'STRONG_SELL')) return 'SELL';
+    return 'HOLD';
+  });
+  const signal = runBacktest(rows).stats;
+  return [
+    { name: '종합 시그널', ...signal },
+    { name: '타이밍 확인', ...timing },
+    { name: '추세추종(EMA)', ...trend },
+    { name: '단순 보유', totalReturn: buyHold, maxDrawdown: buyHoldPeak.mdd, winRate: null, tradeCount: 1 },
+  ];
+}
+
 export const SIGNAL_META = {
   STRONG_BUY: { text: '강한 매수', short: 'BUY', tone: 'good' },
   BUY: { text: '매수', short: 'BUY', tone: 'good' },
