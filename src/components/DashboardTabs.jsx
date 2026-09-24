@@ -1,18 +1,15 @@
 const TABS = [
   ['signal', '시그널'],
-  ['paper', '모의투자'],
   ['backtest', '백테스트'],
-  ['journal', '매매일지'],
   ['about', '방법론'],
 ];
 
-export default function DashboardTabs({ activeTab, onChange, competitionMode, onCompetitionModeChange }) {
+export default function DashboardTabs({ activeTab, onChange }) {
   return (
     <nav style={styles.wrap} aria-label="대시보드 보기 전환">
       <div style={styles.tabs}>
         {TABS.map(([id, label]) => <button key={id} type="button" className="ctrl" style={activeTab === id ? styles.active : {}} onClick={() => onChange(id)} aria-pressed={activeTab === id}>{label}</button>)}
       </div>
-      <label style={styles.mode}><input type="checkbox" checked={competitionMode} onChange={(e) => onCompetitionModeChange(e.target.checked)} /> 대회 모드</label>
     </nav>
   );
 }

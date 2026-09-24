@@ -3,7 +3,7 @@ import { formatPrice, formatPercentSigned } from '../utils/format';
 
 const TIMING_META = { BUY_ZONE: ['매수 후보', 'good'], WATCH_BUY: ['매수 관찰', 'good'], SELL_ZONE: ['매도 후보', 'critical'], WATCH_SELL: ['매도 관찰', 'critical'], WAIT: ['대기', 'warning'] };
 
-export default function DecisionSummary({ last, prev, currency, paperSnapshot }) {
+export default function DecisionSummary({ last, prev, currency }) {
   const signal = SIGNAL_META[last?.signalLabel] ?? { text: '데이터 확인', tone: 'warning' };
   const timing = TIMING_META[last?.timing?.timingLabel] ?? TIMING_META.WAIT;
   const change = last?.close != null && prev?.close ? last.close / prev.close - 1 : null;
@@ -15,7 +15,6 @@ export default function DecisionSummary({ last, prev, currency, paperSnapshot })
       <Card label="현재가" value={formatPrice(last?.close, currency)} detail={change == null ? '변동률 없음' : `전일 대비 ${formatPercentSigned(change)}`} tone={change != null && change >= 0 ? 'good' : 'critical'} />
       <Card label="타이밍" value={timing[0]} detail={`${last?.timing?.buyPoints ?? 0} 매수 / ${last?.timing?.sellPoints ?? 0} 매도 조건`} tone={timing[1]} />
       <Card label="리스크 기준" value={risk == null ? '—' : formatPrice(risk, currency)} detail={risk == null ? 'ATR 계산 대기' : 'ATR×2 손절 참고선'} tone="warning" />
-      <div style={styles.account}><span style={styles.label}>모의계좌</span><strong className="mono-num">{formatPrice(paperSnapshot.equity, currency)}</strong><small>수익률 {formatPercentSigned(paperSnapshot.totalReturn)}</small></div>
       </div>
       <Rationale last={last} />
     </section>

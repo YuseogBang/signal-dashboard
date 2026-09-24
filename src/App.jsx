@@ -11,7 +11,6 @@ import { getSampleData, getTickerMeta, SAMPLE_TICKERS } from './data/sampleData'
 import { compareStrategies, compositeSignal, runBacktest } from './utils/indicators';
 import { parseCsvFile } from './utils/csv';
 import { fetchTossCandles } from './utils/tossApi';
-import PaperTradingPanel from './components/PaperTradingPanel';
 import StrategyPanel from './components/StrategyPanel';
 import DashboardTabs from './components/DashboardTabs';
 import DecisionSummary from './components/DecisionSummary';
@@ -19,7 +18,6 @@ import MarketInsightPanel from './components/MarketInsightPanel';
 import PeerGroupPanel from './components/PeerGroupPanel';
 import PositioningPanel from './components/PositioningPanel';
 import { PEER_GROUPS } from './components/PeerGroupPanel';
-import { executePaperOrder, getPortfolioSnapshot, loadPaperState, persistPaperState, resetPaperState, updatePositionPrice } from './utils/paperTrading';
 import MethodologyPanel from './components/MethodologyPanel';
 
 const DEFAULT_TICKER = SAMPLE_TICKERS[0].id;
@@ -33,13 +31,10 @@ export default function App() {
   const [liveLoading, setLiveLoading] = useState(true);
   const [error, setError] = useState('');
   const [showTable, setShowTable] = useState(false);
-  const [paper, setPaper] = useState(loadPaperState);
-  const [tradeMessage, setTradeMessage] = useState('');
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [peerData, setPeerData] = useState({});
   const [peerLoading, setPeerLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('signal');
-  const [competitionMode, setCompetitionMode] = useState(false);
   const [backtestConfig, setBacktestConfig] = useState({ transactionCost: 0, slippage: 0 });
   const [backtestWindow, setBacktestWindow] = useState(0);
 
@@ -145,8 +140,6 @@ export default function App() {
 
   const last = enriched.at(-1);
   const prev = enriched.at(-2);
-  const paperSymbol = source.type === 'upload' ? uploadedName || 'CSV' : source.id;
-  const paperSnapshot = useMemo(() => getPortfolioSnapshot(paper, paperSymbol, last?.close), [paper, paperSymbol, last?.close]);
   const strategies = useMemo(() => {
     const usable = enriched.filter((r) => r.signalLabel != null);
     const rows = backtestWindow ? usable.slice(-backtestWindow) : usable;
@@ -154,40 +147,10 @@ export default function App() {
   }, [enriched, backtestWindow]);
 
   useEffect(() => {
-    persistPaperState(paper);
-  }, [paper]);
-
-  useEffect(() => {
-    if (last?.close && paper.positions?.[paperSymbol]) setPaper((current) => updatePositionPrice(current, paperSymbol, last.close));
-  }, [last?.close, paperSymbol]);
-
-  useEffect(() => {
     if (!autoRefresh || source.type !== 'live') return undefined;
     const timer = window.setInterval(() => { void handleLiveLookup(source.id); }, 60_000);
     return () => window.clearInterval(timer);
   }, [autoRefresh, source.type, source.id]);
-
-  function handlePaperOrder(order) {
-    const result = executePaperOrder(paper, order);
-    if (result.error) {
-      setTradeMessage(result.error);
-      return;
-    }
-    setPaper(result.state);
-    setTradeMessage(`${order.side === 'BUY' ? '매수' : '매도'} 기록이 저장되었습니다.`);
-  }
-
-  function handleJournal(entry) {
-    setPaper((current) => ({ ...current, journal: [{ id: `${Date.now()}-${Math.random()}`, timestamp: new Date().toISOString(), ...entry }, ...(current.journal ?? [])] }));
-    setTradeMessage('매매일지가 저장되었습니다.');
-  }
-
-  function handlePaperReset() {
-    if (window.confirm('모의계좌, 체결 기록, 매매일지를 모두 초기화할까요?')) {
-      setPaper(resetPaperState());
-      setTradeMessage('모의계좌가 초기화되었습니다.');
-    }
-  }
 
   return (
     <>
@@ -227,7 +190,7 @@ export default function App() {
 
           {enriched.length > 0 && (
             <>
-              <DecisionSummary last={last} prev={prev} currency={currency} paperSnapshot={paperSnapshot} />
+              <DecisionSummary last={last} prev={prev} currency={currency} />
               <StatTiles
                 last={last?.close}
                 prev={prev?.close}
@@ -243,37 +206,27 @@ export default function App() {
                 weightRsi={last?.weightRsi}
                 weightMacd={last?.weightMacd}
               />
-              <DashboardTabs activeTab={activeTab} onChange={setActiveTab} competitionMode={competitionMode} onCompetitionModeChange={setCompetitionMode} />
+              <DashboardTabs activeTab={activeTab} onChange={setActiveTab} />
 
-              {(activeTab === 'signal' || competitionMode) && <div style={styles.card}><MarketInsightPanel data={enriched} last={last} prev={prev} currency={currency} symbol={paperSymbol} label={label} sourceType={source.type} /></div>}
+              {activeTab === 'signal' && <div style={styles.card}><MarketInsightPanel data={enriched} last={last} prev={prev} currency={currency} symbol={source.id} label={label} sourceType={source.type} /></div>}
 
-              {(activeTab === 'signal' || competitionMode) && <div style={styles.card}><PeerGroupPanel data={enriched} symbol={paperSymbol} sourceType={source.type} peerData={peerData} peerLoading={peerLoading} /></div>}
+              {activeTab === 'signal' && <div style={styles.card}><PeerGroupPanel data={enriched} symbol={source.id} sourceType={source.type} peerData={peerData} peerLoading={peerLoading} /></div>}
 
-              {(activeTab === 'signal' || competitionMode) && <div style={styles.card}><PositioningPanel symbol={paperSymbol} data={enriched} last={last} peerData={peerData} sourceType={source.type} /></div>}
+              {activeTab === 'signal' && <div style={styles.card}><PositioningPanel symbol={source.id} data={enriched} last={last} peerData={peerData} sourceType={source.type} /></div>}
 
-              {(activeTab === 'signal' || competitionMode) && <div style={styles.card}><TimingPanel last={last} currency={currency} /></div>}
+              {activeTab === 'signal' && <div style={styles.card}><TimingPanel last={last} currency={currency} /></div>}
 
-              {(activeTab === 'signal' || competitionMode) && <div style={styles.card}><PriceChart data={enriched} currency={currency} last={last} /></div>}
+              {activeTab === 'signal' && <div style={styles.card}><PriceChart data={enriched} currency={currency} last={last} /></div>}
 
-              {!competitionMode && activeTab === 'signal' && <div style={styles.card}><IndicatorPanel data={enriched} /></div>}
+              {activeTab === 'signal' && <div style={styles.card}><IndicatorPanel data={enriched} /></div>}
 
-              {(activeTab === 'paper' || activeTab === 'journal' || competitionMode) && <div style={styles.card}>
-                <PaperTradingPanel symbol={paperSymbol} currency={currency} last={last} paper={paper} snapshot={paperSnapshot} onOrder={handlePaperOrder} onJournal={handleJournal} onReset={handlePaperReset} />
-                {tradeMessage && <div role="status" style={styles.tradeMessage}>{tradeMessage}</div>}
-              </div>}
+              {activeTab === 'signal' && <div style={styles.card}><RiskPanel last={last} currency={currency} /></div>}
 
-              {!competitionMode && (activeTab === 'paper' || activeTab === 'signal') && <div style={styles.card}><RiskPanel last={last} currency={currency} /></div>}
+              {activeTab === 'backtest' && backtest && <div style={styles.card}><BacktestPanel backtest={backtest} config={backtestConfig} period={backtestWindow} onPeriodChange={setBacktestWindow} onConfigChange={setBacktestConfig} /></div>}
 
-              {!competitionMode && activeTab === 'backtest' && backtest && <div style={styles.card}><BacktestPanel backtest={backtest} config={backtestConfig} period={backtestWindow} onPeriodChange={setBacktestWindow} onConfigChange={setBacktestConfig} /></div>}
+              {activeTab === 'backtest' && strategies.length > 0 && <div style={styles.card}><StrategyPanel strategies={strategies} /></div>}
 
-              {!competitionMode && activeTab === 'backtest' && strategies.length > 0 && <div style={styles.card}><StrategyPanel strategies={strategies} /></div>}
-
-              {!competitionMode && activeTab === 'journal' && <div style={styles.card}>
-                <h2 style={styles.sectionTitle}>일별 데이터·체결 분석</h2>
-                <DataTable data={enriched} currency={currency} />
-              </div>}
-
-              {!competitionMode && activeTab === 'signal' && <div style={styles.tableHeader}>
+              {activeTab === 'signal' && <div style={styles.tableHeader}>
                 <h2 style={{ margin: 0, fontSize: 14, color: 'var(--text-secondary)' }}>일별 데이터 &amp; 시그널</h2>
                 <button
                   type="button"
@@ -284,8 +237,8 @@ export default function App() {
                   {showTable ? '테이블 숨기기' : '테이블 보기'}
                 </button>
               </div>}
-              {!competitionMode && activeTab === 'signal' && showTable && <DataTable data={enriched} currency={currency} />}
-              {!competitionMode && activeTab === 'about' && <div style={styles.card}><MethodologyPanel /></div>}
+              {activeTab === 'signal' && showTable && <DataTable data={enriched} currency={currency} />}
+              {activeTab === 'about' && <div style={styles.card}><MethodologyPanel /></div>}
             </>
           )}
         </main>
@@ -293,8 +246,8 @@ export default function App() {
         <footer style={styles.footer}>
           방법론: RSI(14) 과매수/과매도 점수와 MACD(12,26,9) 히스토그램 모멘텀 점수를 ADX(14) 기반으로
           동적 가중 평균한 복합 스코어와 EMA·볼린저·스토캐스틱·지지/저항·거래량 기반 타이밍 조건을 함께 표시합니다.
-          모의투자 워크스페이스는 실제 주문 없이 가상 체결·리스크 제한·매매일지·전략 비교를 제공하며, 모든 계산은
-          브라우저 안에서만 처리됩니다. 샘플 데이터는 실제 시세가 아닌 시뮬레이션이며, 본 도구는 투자 참고용이고
+          백테스트와 리스크 가이드는 실제 주문 없이 분석 결과를 검증하기 위한 참고 기능이며, 모든 계산은 브라우저 안에서만 처리됩니다.
+          샘플 데이터는 실제 시세가 아닌 시뮬레이션이며, 본 도구는 투자 참고용이고
           투자 권유가 아닙니다.
         </footer>
       </div>
@@ -340,7 +293,6 @@ const styles = {
   },
   tableHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 },
   sectionTitle: { margin: '0 0 12px', fontSize: 14, color: 'var(--text-secondary)' },
-  tradeMessage: { marginTop: 10, fontSize: 12, color: 'var(--accent-strong)' },
   refreshToggle: { fontSize: 11.5, color: 'var(--text-muted)', alignSelf: 'flex-end', marginTop: -10 },
   sourceBar: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 7, minHeight: 30, padding: '7px 11px', border: '1px solid var(--border)', borderRadius: 10, background: 'var(--surface-card-alt)', color: 'var(--text-muted)', fontSize: 10.5 },
   sourceDot: { width: 7, height: 7, borderRadius: '50%', background: 'var(--accent-strong)', boxShadow: '0 0 0 3px var(--accent-soft)' },
