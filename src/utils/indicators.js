@@ -466,10 +466,10 @@ export const TREND_META = {
 /**
  * 시그널 기반의 단순 롱-온리 백테스트.
  * BUY/STRONG_BUY에서 매수(전량), SELL/STRONG_SELL에서 청산(현금 보유), HOLD는 직전 포지션 유지.
- * 거래비용·슬리피지·분할매매는 반영하지 않으며, 이 앱이 산출한 시그널을 그대로 따랐을 때의
+ * 거래비용과 슬리피지는 호출 시 선택적으로 반영하며, 이 앱이 산출한 시그널을 그대로 따랐을 때의
  * 참고용 결과다 (과최적화·생존 편향 등 실사용 전 반드시 별도 검증 필요).
  */
-export function runBacktest(rows) {
+export function runBacktest(rows, { transactionCost = 0, slippage = 0 } = {}) {
   let position = 0; // 0 = 현금, 1 = 매수 보유
   let equity = 1;
   let buyHoldEquity = 1;
@@ -479,6 +479,7 @@ export function runBacktest(rows) {
   let maxDrawdown = 0;
   const trades = [];
   let currentTrade = null;
+  const friction = Math.max(0, Number(transactionCost) || 0) + Math.max(0, Number(slippage) || 0);
 
   for (let i = 0; i < rows.length; i++) {
     const r = rows[i];
@@ -494,12 +495,14 @@ export function runBacktest(rows) {
 
     const label = r.signalLabel;
     if (position === 0 && (label === 'BUY' || label === 'STRONG_BUY')) {
+      equity *= Math.max(0, 1 - friction);
       position = 1;
       currentTrade = { entryDate: r.date, entryPrice: r.close };
     } else if (position === 1 && (label === 'SELL' || label === 'STRONG_SELL')) {
+      equity *= Math.max(0, 1 - friction);
       position = 0;
       if (currentTrade) {
-        trades.push({ ...currentTrade, exitDate: r.date, exitPrice: r.close, return: r.close / currentTrade.entryPrice - 1 });
+        trades.push({ ...currentTrade, exitDate: r.date, exitPrice: r.close, return: (r.close / currentTrade.entryPrice) * Math.max(0, 1 - friction) ** 2 - 1 });
         currentTrade = null;
       }
     }

@@ -10,12 +10,13 @@ import {
   ReferenceLine,
   Legend,
 } from 'recharts';
+import TermTooltip from './TermTooltip';
 
 export default function IndicatorPanel({ data }) {
   return (
     <div style={{ display: 'grid', gap: 20 }}>
       <section aria-labelledby="rsi-heading">
-        <h2 id="rsi-heading" style={styles.h3}>RSI (14)</h2>
+        <h2 id="rsi-heading" style={styles.h3}><TermTooltip term="RSI">RSI (14)</TermTooltip></h2>
         <div style={{ width: '100%', height: 140 }}>
           <ResponsiveContainer>
             <ComposedChart data={data} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
@@ -35,7 +36,7 @@ export default function IndicatorPanel({ data }) {
       </section>
 
       <section aria-labelledby="macd-heading">
-        <h2 id="macd-heading" style={styles.h3}>MACD (12, 26, 9)</h2>
+        <h2 id="macd-heading" style={styles.h3}><TermTooltip term="MACD">MACD (12, 26, 9)</TermTooltip></h2>
         <div style={{ width: '100%', height: 160 }}>
           <ResponsiveContainer>
             <ComposedChart data={data} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>

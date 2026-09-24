@@ -47,7 +47,7 @@ export default function RiskPanel({ last, currency }) {
 
       <div style={styles.grid}>
         <div style={styles.block}>
-          <div style={styles.label}>ATR (14)</div>
+          <div style={styles.label}><TermTooltip term="ATR">ATR (14)</TermTooltip></div>
           <div style={styles.value} className="mono-num">
             {formatPrice(atrValue, currency)}
           </div>
@@ -155,3 +155,4 @@ const styles = {
   sizingResult: { fontSize: 13, color: 'var(--text-primary)', marginTop: 12, lineHeight: 1.7 },
   sizingHint: { fontSize: 11.5, color: 'var(--text-muted)', marginTop: 12 },
 };
+import TermTooltip from './TermTooltip';

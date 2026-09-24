@@ -1,5 +1,6 @@
 import { SIGNAL_META, TREND_META } from '../utils/indicators';
 import { formatPrice, formatPercentAbs, formatDecimal1, formatDecimal2 } from '../utils/format';
+import TermTooltip from './TermTooltip';
 
 export default function StatTiles({
   last,
@@ -75,14 +76,14 @@ export default function StatTiles({
             ) : null
           }
         />
-        <Tile label="RSI (14)" value={formatDecimal1(rsi)} sub={rsi != null ? (rsi >= 70 ? '과매수' : rsi <= 30 ? '과매도' : '중립') : null} />
+        <Tile label={<TermTooltip term="RSI">RSI (14)</TermTooltip>} value={formatDecimal1(rsi)} sub={rsi != null ? (rsi >= 70 ? '과매수' : rsi <= 30 ? '과매도' : '중립') : null} />
         <Tile
-          label="MACD 히스토그램"
+          label={<TermTooltip term="MACD">MACD 히스토그램</TermTooltip>}
           value={formatDecimal2(histogram)}
           sub={histogram != null ? (histogram >= 0 ? '상승 모멘텀' : '하락 모멘텀') : null}
         />
         <Tile
-          label="추세 (ADX 14)"
+          label={<TermTooltip term="ADX">추세 (ADX 14)</TermTooltip>}
           value={adx != null ? formatDecimal1(adx) : '—'}
           sub={
             trendMeta ? (
@@ -95,7 +96,7 @@ export default function StatTiles({
           }
         />
         <Tile
-          label="거래량 확인"
+          label={<TermTooltip term="상대거래량">거래량 확인</TermTooltip>}
           value={relVolume != null ? `${formatDecimal2(relVolume)}x` : '—'}
           sub={
             volumeConfirmed == null ? (

@@ -20,6 +20,7 @@ import PeerGroupPanel from './components/PeerGroupPanel';
 import PositioningPanel from './components/PositioningPanel';
 import { PEER_GROUPS } from './components/PeerGroupPanel';
 import { executePaperOrder, getPortfolioSnapshot, loadPaperState, persistPaperState, resetPaperState, updatePositionPrice } from './utils/paperTrading';
+import MethodologyPanel from './components/MethodologyPanel';
 
 const DEFAULT_TICKER = SAMPLE_TICKERS[0].id;
 const DEFAULT_LIVE_SYMBOL = '005930';
@@ -39,6 +40,8 @@ export default function App() {
   const [peerLoading, setPeerLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('signal');
   const [competitionMode, setCompetitionMode] = useState(false);
+  const [backtestConfig, setBacktestConfig] = useState({ transactionCost: 0, slippage: 0 });
+  const [backtestWindow, setBacktestWindow] = useState(0);
 
   const currency = useMemo(() => {
     if (source.type === 'sample') {
@@ -136,14 +139,19 @@ export default function App() {
   const backtest = useMemo(() => {
     const usable = enriched.filter((r) => r.signalLabel != null);
     if (usable.length < 10) return null;
-    return runBacktest(usable);
-  }, [enriched]);
+    const rows = backtestWindow ? usable.slice(-backtestWindow) : usable;
+    return runBacktest(rows, backtestConfig);
+  }, [enriched, backtestConfig, backtestWindow]);
 
   const last = enriched.at(-1);
   const prev = enriched.at(-2);
   const paperSymbol = source.type === 'upload' ? uploadedName || 'CSV' : source.id;
   const paperSnapshot = useMemo(() => getPortfolioSnapshot(paper, paperSymbol, last?.close), [paper, paperSymbol, last?.close]);
-  const strategies = useMemo(() => enriched.length > 10 ? compareStrategies(enriched) : [], [enriched]);
+  const strategies = useMemo(() => {
+    const usable = enriched.filter((r) => r.signalLabel != null);
+    const rows = backtestWindow ? usable.slice(-backtestWindow) : usable;
+    return rows.length > 10 ? compareStrategies(rows) : [];
+  }, [enriched, backtestWindow]);
 
   useEffect(() => {
     persistPaperState(paper);
@@ -186,7 +194,7 @@ export default function App() {
       <a href="#main-content" className="skip-link">
         본문 바로가기
       </a>
-      <div style={styles.page}>
+      <div className="dashboard-page" style={styles.page}>
         <header style={styles.header}>
           <div>
             <h1 style={styles.title}>투자 시그널 대시보드</h1>
@@ -198,7 +206,7 @@ export default function App() {
           </div>
         </header>
 
-        <main id="main-content" style={styles.main}>
+        <main id="main-content" className="dashboard-main" style={styles.main}>
           <ControlPanel
             source={source}
             onSelectSample={handleSelectSample}
@@ -209,6 +217,12 @@ export default function App() {
             liveLoading={liveLoading}
             defaultLiveSymbol={DEFAULT_LIVE_SYMBOL}
           />
+          <div style={styles.sourceBar} role="status" aria-live="polite">
+            <span style={styles.sourceDot} />
+            <strong>{source.type === 'live' ? '실시간 데이터' : source.type === 'upload' ? '사용자 CSV' : '데모 데이터'}</strong>
+            <span>{source.type === 'live' ? '토스증권 Open API · 캔들 기반 지표 계산' : source.type === 'upload' ? uploadedName : '샘플 시계열 · API 키 없이 즉시 확인'}</span>
+            {liveLoading && <span style={styles.loadingText}>조회 중…</span>}
+          </div>
           {source.type === 'live' && <label style={styles.refreshToggle}><input type="checkbox" checked={autoRefresh} onChange={(e) => setAutoRefresh(e.target.checked)} /> 1분마다 실시간 가격 자동 갱신</label>}
 
           {enriched.length > 0 && (
@@ -250,7 +264,7 @@ export default function App() {
 
               {!competitionMode && (activeTab === 'paper' || activeTab === 'signal') && <div style={styles.card}><RiskPanel last={last} currency={currency} /></div>}
 
-              {!competitionMode && activeTab === 'backtest' && backtest && <div style={styles.card}><BacktestPanel backtest={backtest} /></div>}
+              {!competitionMode && activeTab === 'backtest' && backtest && <div style={styles.card}><BacktestPanel backtest={backtest} config={backtestConfig} period={backtestWindow} onPeriodChange={setBacktestWindow} onConfigChange={setBacktestConfig} /></div>}
 
               {!competitionMode && activeTab === 'backtest' && strategies.length > 0 && <div style={styles.card}><StrategyPanel strategies={strategies} /></div>}
 
@@ -271,6 +285,7 @@ export default function App() {
                 </button>
               </div>}
               {!competitionMode && activeTab === 'signal' && showTable && <DataTable data={enriched} currency={currency} />}
+              {!competitionMode && activeTab === 'about' && <div style={styles.card}><MethodologyPanel /></div>}
             </>
           )}
         </main>
@@ -327,5 +342,8 @@ const styles = {
   sectionTitle: { margin: '0 0 12px', fontSize: 14, color: 'var(--text-secondary)' },
   tradeMessage: { marginTop: 10, fontSize: 12, color: 'var(--accent-strong)' },
   refreshToggle: { fontSize: 11.5, color: 'var(--text-muted)', alignSelf: 'flex-end', marginTop: -10 },
+  sourceBar: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 7, minHeight: 30, padding: '7px 11px', border: '1px solid var(--border)', borderRadius: 10, background: 'var(--surface-card-alt)', color: 'var(--text-muted)', fontSize: 10.5 },
+  sourceDot: { width: 7, height: 7, borderRadius: '50%', background: 'var(--accent-strong)', boxShadow: '0 0 0 3px var(--accent-soft)' },
+  loadingText: { color: 'var(--status-warning)', fontWeight: 700, marginLeft: 'auto' },
   footer: { fontSize: 11.5, color: 'var(--text-muted)', lineHeight: 1.6, marginTop: 8, borderTop: '1px solid var(--gridline)', paddingTop: 14 },
 };

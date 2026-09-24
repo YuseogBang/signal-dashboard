@@ -3,6 +3,7 @@ const TABS = [
   ['paper', '모의투자'],
   ['backtest', '백테스트'],
   ['journal', '매매일지'],
+  ['about', '방법론'],
 ];
 
 export default function DashboardTabs({ activeTab, onChange, competitionMode, onCompetitionModeChange }) {
@@ -22,4 +23,3 @@ const styles = {
   active: { color: 'var(--seafoam)', borderColor: 'var(--accent-strong)', background: 'var(--accent-soft)' },
   mode: { display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: 'var(--text-secondary)', cursor: 'pointer' },
 };
-

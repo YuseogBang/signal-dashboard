@@ -9,14 +9,28 @@ export default function DecisionSummary({ last, prev, currency, paperSnapshot })
   const change = last?.close != null && prev?.close ? last.close / prev.close - 1 : null;
   const risk = last?.atr && last?.close ? last.close - last.atr * 2 : null;
   return (
-    <section aria-label="현재 판단 요약" style={styles.wrap}>
+    <section aria-label="현재 판단 요약">
+      <div style={styles.wrap}>
       <Card featured label="현재 가장 중요한 판단 · 종합 시그널" value={signal.text} detail={last?.signalScore == null ? '—' : `점수 ${last.signalScore >= 0 ? '+' : ''}${last.signalScore.toFixed(2)}`} tone={signal.tone} />
       <Card label="현재가" value={formatPrice(last?.close, currency)} detail={change == null ? '변동률 없음' : `전일 대비 ${formatPercentSigned(change)}`} tone={change != null && change >= 0 ? 'good' : 'critical'} />
       <Card label="타이밍" value={timing[0]} detail={`${last?.timing?.buyPoints ?? 0} 매수 / ${last?.timing?.sellPoints ?? 0} 매도 조건`} tone={timing[1]} />
       <Card label="리스크 기준" value={risk == null ? '—' : formatPrice(risk, currency)} detail={risk == null ? 'ATR 계산 대기' : 'ATR×2 손절 참고선'} tone="warning" />
       <div style={styles.account}><span style={styles.label}>모의계좌</span><strong className="mono-num">{formatPrice(paperSnapshot.equity, currency)}</strong><small>수익률 {formatPercentSigned(paperSnapshot.totalReturn)}</small></div>
+      </div>
+      <Rationale last={last} />
     </section>
   );
+}
+
+function Rationale({ last }) {
+  const positive = [];
+  const caution = [];
+  if (last?.histogram >= 0) positive.push('MACD 상승 모멘텀'); else caution.push('MACD 하락 모멘텀');
+  if (last?.timing?.emaFast > last?.timing?.emaSlow) positive.push('EMA20이 EMA50 위'); else if (last?.timing?.emaFast != null) caution.push('EMA20이 EMA50 아래');
+  if (last?.volumeConfirmed) positive.push('상대거래량 확인'); else if (last?.relVolume != null) caution.push('거래량 뒷받침 약함');
+  if (last?.rsi >= 70) caution.push('RSI 과매수 구간');
+  if (last?.timing?.percentB >= 0.9) caution.push('볼린저 상단 접근');
+  return <div className="signal-rationale" style={styles.rationale}><div><span style={styles.rationaleLabel}>판단 근거</span><strong style={styles.rationaleTitle}>신호를 이렇게 해석합니다</strong></div><div style={styles.rationaleGroup}><span style={styles.goodLabel}>긍정 요인</span><span>{positive.length ? positive.join(' · ') : '확인 중'}</span></div><div style={styles.rationaleGroup}><span style={styles.cautionLabel}>주의 요인</span><span>{caution.length ? caution.join(' · ') : '뚜렷한 주의 신호 없음'}</span></div></div>;
 }
 
 function Card({ label, value, detail, tone, featured = false }) {
@@ -35,4 +49,10 @@ const styles = {
   featured: { gridColumn: 'span 2', minHeight: 118, padding: '18px 20px' },
   account: { background: 'var(--accent-soft)', border: '1px solid var(--accent)', borderRadius: 'var(--radius-card)', padding: '14px 15px', display: 'flex', flexDirection: 'column', gap: 5, minHeight: 92, boxShadow: 'var(--shadow-soft)' },
   label: { color: 'var(--text-muted)', fontSize: 10.5, fontWeight: 700 },
+  rationale: { display: 'grid', gridTemplateColumns: 'minmax(150px, 0.8fr) 1fr 1fr', gap: 12, alignItems: 'center', marginTop: 9, padding: '11px 14px', border: '1px solid var(--border)', borderRadius: 12, background: 'var(--surface-card-alt)', fontSize: 11, color: 'var(--text-secondary)' },
+  rationaleLabel: { display: 'block', color: 'var(--text-muted)', fontSize: 10, marginBottom: 3 },
+  rationaleTitle: { fontSize: 12, color: 'var(--text-primary)' },
+  rationaleGroup: { display: 'flex', flexDirection: 'column', gap: 4, lineHeight: 1.45 },
+  goodLabel: { color: 'var(--status-good)', fontWeight: 700 },
+  cautionLabel: { color: 'var(--status-warning)', fontWeight: 700 },
 };

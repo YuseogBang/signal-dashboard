@@ -125,11 +125,112 @@ a.ctrl:focus-visible {
   outline-offset: 2px;
 }
 
+/* 지표 용어 도움말: 마우스 오버와 키보드 포커스 모두 지원 */
+.term-tooltip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: help;
+  outline: none;
+}
+.term-tooltip__mark {
+  display: inline-grid;
+  place-items: center;
+  width: 13px;
+  height: 13px;
+  border: 1px solid var(--text-muted);
+  border-radius: 50%;
+  color: var(--text-muted);
+  font-size: 9px;
+  line-height: 1;
+  font-weight: 700;
+}
+.term-tooltip__content {
+  position: absolute;
+  z-index: 20;
+  left: 0;
+  bottom: calc(100% + 9px);
+  width: 235px;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-card);
+  color: var(--text-secondary);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.5;
+  white-space: normal;
+  text-transform: none;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(4px);
+  transition: opacity 0.15s ease, transform 0.15s ease, visibility 0.15s ease;
+}
+.term-tooltip__content::after {
+  content: '';
+  position: absolute;
+  left: 14px;
+  top: 100%;
+  border: 5px solid transparent;
+  border-top-color: var(--border);
+}
+.term-tooltip:hover .term-tooltip__content,
+.term-tooltip:focus-visible .term-tooltip__content {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+.term-tooltip:focus-visible .term-tooltip__mark {
+  outline: 2px solid var(--accent-strong);
+  outline-offset: 2px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .ctrl {
     transition: none;
   }
   .ctrl:active {
     transform: none;
+  }
+  .term-tooltip__content {
+    transition: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .dashboard-page {
+    padding: 20px 14px 44px !important;
+    gap: 14px !important;
+  }
+  .dashboard-main {
+    gap: 13px !important;
+  }
+  .signal-rationale {
+    grid-template-columns: 1fr !important;
+    gap: 9px !important;
+  }
+  .insight-sections {
+    grid-template-columns: 1fr !important;
+  }
+  .insight-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+  .peer-summary {
+    grid-template-columns: 1fr !important;
+  }
+  .methodology-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .term-tooltip__content {
+    left: auto;
+    right: 0;
+    width: min(235px, calc(100vw - 40px));
+  }
+  .term-tooltip__content::after {
+    left: auto;
+    right: 14px;
   }
 }

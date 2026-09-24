@@ -33,9 +33,9 @@ export default function TimingPanel({ last, currency }) {
       </div>
 
       <div style={styles.grid}>
-        <Metric label="스토캐스틱 %K / %D" value={timing?.stochK == null ? '-' : `${timing.stochK.toFixed(1)} / ${timing.stochD.toFixed(1)}`} hint="과매도 20 · 과매수 80" />
-        <Metric label="볼린저 %B" value={formatPercent(timing?.percentB)} hint="0% 하단 · 100% 상단" />
-        <Metric label="EMA 20 / 50" value={timing?.emaFast == null ? '-' : `${formatPrice(timing.emaFast, currency)} / ${formatPrice(timing.emaSlow, currency)}`} hint="단기·중기 추세 정렬" />
+        <Metric label={<TermTooltip term="스토캐스틱">스토캐스틱 %K / %D</TermTooltip>} value={timing?.stochK == null ? '-' : `${timing.stochK.toFixed(1)} / ${timing.stochD.toFixed(1)}`} hint="과매도 20 · 과매수 80" />
+        <Metric label={<TermTooltip term="볼린저">볼린저 %B</TermTooltip>} value={formatPercent(timing?.percentB)} hint="0% 하단 · 100% 상단" />
+        <Metric label={<TermTooltip term="EMA">EMA 20 / 50</TermTooltip>} value={timing?.emaFast == null ? '-' : `${formatPrice(timing.emaFast, currency)} / ${formatPrice(timing.emaSlow, currency)}`} hint="단기·중기 추세 정렬" />
         <Metric label="최근 지지 / 저항" value={timing?.support == null ? '-' : `${formatPrice(timing.support, currency)} / ${formatPrice(timing.resistance, currency)}`} hint="최근 20봉 고저 범위" />
       </div>
 
@@ -92,3 +92,4 @@ const styles = {
   buyNote: { color: 'var(--status-good)', background: 'var(--status-good-bg)' },
   sellNote: { color: 'var(--status-critical)', background: 'var(--status-critical-bg)' },
 };
+import TermTooltip from './TermTooltip';
