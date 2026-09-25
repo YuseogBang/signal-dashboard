@@ -33,22 +33,22 @@ function Rationale({ last }) {
 }
 
 function Card({ label, value, detail, tone, featured = false }) {
-  return <div style={{ ...styles.card, ...(featured ? styles.featured : {}), ...toneCard(tone), borderTopColor: `var(--status-${tone})` }}><span style={styles.label}>{label}</span><strong style={{ color: tone === 'critical' ? '#dbeafe' : `var(--status-${tone})` }}>{value}</strong><small>{detail}</small></div>;
+  return <div style={{ ...styles.card, ...(featured ? styles.featured : {}), ...toneCard(tone), borderTopColor: `var(--status-${tone})` }}><span style={styles.label}>{label}</span><strong style={{ color: `var(--status-${tone})` }}>{value}</strong><small>{detail}</small></div>;
 }
 
 function toneCard(tone) {
-  if (tone === 'good') return { background: 'linear-gradient(145deg, rgba(16, 185, 129, 0.30), rgba(10, 44, 47, 0.94) 72%)', boxShadow: 'inset 0 1px 0 rgba(167, 243, 208, 0.16)' };
-  if (tone === 'critical') return { background: 'linear-gradient(145deg, rgba(37, 99, 235, 0.40), rgba(22, 35, 64, 0.96) 72%)', boxShadow: 'inset 0 1px 0 rgba(191, 219, 254, 0.16)' };
-  return { background: 'linear-gradient(145deg, rgba(245, 158, 11, 0.22), rgba(50, 43, 27, 0.94) 72%)' };
+  if (tone === 'good') return { background: 'var(--signal-good-bg)', boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.35)' };
+  if (tone === 'critical') return { background: 'var(--signal-critical-bg)', boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.35)' };
+  return { background: 'var(--signal-warning-bg)' };
 }
 
 const styles = {
   wrap: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(145px, 1fr))', gap: 8 },
-  card: { background: 'var(--surface-card-alt)', border: '1px solid var(--border)', borderTop: '3px solid', borderRadius: 'var(--radius-card)', padding: '14px 15px', display: 'flex', flexDirection: 'column', gap: 5, minHeight: 92, boxShadow: 'var(--shadow-soft)' },
+  card: { background: 'var(--surface-card-alt)', border: '1px solid var(--border)', borderTop: '3px solid', borderRadius: 'var(--radius-card)', padding: '14px 15px', display: 'flex', flexDirection: 'column', gap: 5, minHeight: 92, boxShadow: 'var(--shadow-soft)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)' },
   featured: { gridColumn: 'span 2', minHeight: 118, padding: '18px 20px' },
   account: { background: 'var(--accent-soft)', border: '1px solid var(--accent)', borderRadius: 'var(--radius-card)', padding: '14px 15px', display: 'flex', flexDirection: 'column', gap: 5, minHeight: 92, boxShadow: 'var(--shadow-soft)' },
   label: { color: 'var(--text-muted)', fontSize: 10.5, fontWeight: 700 },
-  rationale: { display: 'grid', gridTemplateColumns: 'minmax(150px, 0.8fr) 1fr 1fr', gap: 12, alignItems: 'center', marginTop: 9, padding: '11px 14px', border: '1px solid var(--border)', borderRadius: 12, background: 'var(--surface-card-alt)', fontSize: 11, color: 'var(--text-secondary)' },
+  rationale: { display: 'grid', gridTemplateColumns: 'minmax(150px, 0.8fr) 1fr 1fr', gap: 12, alignItems: 'center', marginTop: 9, padding: '11px 14px', border: '1px solid var(--border)', borderRadius: 12, background: 'var(--surface-card-alt)', fontSize: 11, color: 'var(--text-secondary)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)' },
   rationaleLabel: { display: 'block', color: 'var(--text-muted)', fontSize: 10, marginBottom: 3 },
   rationaleTitle: { fontSize: 12, color: 'var(--text-primary)' },
   rationaleGroup: { display: 'flex', flexDirection: 'column', gap: 4, lineHeight: 1.45 },

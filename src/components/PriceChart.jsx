@@ -108,7 +108,7 @@ const ttStyles = {
     borderRadius: 8,
     padding: '8px 12px',
     fontSize: 12,
-    boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
+    boxShadow: '0 4px 12px rgba(35,52,66,0.10)',
   },
   date: { color: 'var(--text-muted)', marginBottom: 4 },
   row: { color: 'var(--text-primary)' },

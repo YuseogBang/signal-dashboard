@@ -1,5 +1,8 @@
 const TABS = [
   ['signal', '시그널'],
+  ['plan', '매매 계획'],
+  ['holdings', '보유 관리'],
+  ['market', '시장 비교'],
   ['backtest', '백테스트'],
   ['about', '방법론'],
 ];

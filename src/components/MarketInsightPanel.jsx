@@ -13,7 +13,7 @@ export default function MarketInsightPanel({ data, last, prev, currency, symbol,
   return (
     <section aria-labelledby="market-insight-heading">
       <div style={styles.header}>
-        <div><h2 id="market-insight-heading" style={styles.title}>일봉과 주요 지표</h2><p style={styles.description}>토스증권 종목 화면의 핵심 정보 구조를 분석용 데이터에 맞춰 재구성했습니다.</p></div>
+        <div><h2 id="market-insight-heading" style={styles.title}>일봉과 주요 지표</h2><p style={styles.description}>한국투자증권 시세 API의 일봉 데이터를 분석용 정보 구조로 재구성했습니다.</p></div>
         <span style={styles.source}>{sourceType === 'live' ? '실시간 OHLCV' : '샘플·CSV 분석'}</span>
       </div>
 

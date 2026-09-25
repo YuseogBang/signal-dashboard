@@ -29,7 +29,7 @@ export default function ControlPanel({
       {onLiveLookup && (
         <form style={styles.group} onSubmit={submitLiveLookup}>
           <label htmlFor="live-symbol" style={styles.label}>
-            실시간 조회 (토스증권 Open API)
+            실시간 조회 (한국투자증권 Open API)
           </label>
           <div style={styles.uploadRow}>
             <input

@@ -1,43 +1,75 @@
 @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
 
-/* Apple × Bauhaus — 절제된 다크 캔버스, 둥근 카드, 명확한 기하학적 위계 */
+/* Apple × Bauhaus — 밝은 리서치 데스크, 절제된 색과 선명한 정보 위계 */
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 
-  --surface-page: #12181f;
-  --surface-card: #1a2332;
-  --surface-card-alt: #202b3d;
-  --text-primary: #f1faee;
-  --text-secondary: #c7d4d9;
-  --text-muted: #7f93a1;
+  --surface-page: #eef3f6;
+  --surface-card: rgba(255, 255, 255, 0.68);
+  --surface-card-alt: rgba(255, 255, 255, 0.48);
+  --text-primary: #16212b;
+  --text-secondary: #4f5e6b;
+  --text-muted: #87939d;
 
-  --accent: #2d8b8b;
-  --accent-strong: #3aa9a9;
-  --accent-soft: rgba(45, 139, 139, 0.16);
-  --seafoam: #a8dadc;
+  --accent: #148f86;
+  --accent-strong: #08776f;
+  --accent-soft: rgba(20, 143, 134, 0.10);
+  --seafoam: #9edbd2;
 
-  --gridline: rgba(241, 250, 238, 0.08);
-  --baseline: rgba(241, 250, 238, 0.24);
-  --border: rgba(241, 250, 238, 0.12);
+  --gridline: rgba(22, 33, 43, 0.08);
+  --baseline: rgba(22, 33, 43, 0.20);
+  --border: rgba(255, 255, 255, 0.78);
 
   /* 차트 시리즈 색상: dataviz 스킬로 색약 대비(CVD) 검증된 팔레트 — 임의 변경 금지 */
   --series-price: #3987e5;
   --series-macd: #199e70;
   --series-signal-line: #d95926;
 
-  --status-good: #16c116;
-  --status-warning: #fab219;
-  --status-critical: #e66767;
-  --status-good-bg: rgba(22, 193, 22, 0.14);
-  --status-warning-bg: rgba(250, 178, 25, 0.16);
-  --status-critical-bg: rgba(230, 103, 103, 0.14);
+  --status-good: #e44752;
+  --status-warning: #c98220;
+  --status-critical: #3677d8;
+  --status-good-bg: rgba(228, 71, 82, 0.11);
+  --status-warning-bg: rgba(201, 130, 32, 0.12);
+  --status-critical-bg: rgba(54, 119, 216, 0.11);
+  --signal-good-bg: linear-gradient(135deg, #ffffff 0%, #fff1f1 100%);
+  --signal-critical-bg: linear-gradient(135deg, #ffffff 0%, #eef4ff 100%);
+  --signal-warning-bg: linear-gradient(135deg, #ffffff 0%, #fff8eb 100%);
 
   --radius-control: 12px;
   --radius-card: 16px;
   --radius-panel: 20px;
-  --shadow-soft: 0 10px 30px rgba(0, 0, 0, 0.14);
+  --shadow-soft: 0 18px 42px rgba(74, 96, 112, 0.11), 0 2px 8px rgba(74, 96, 112, 0.05);
+  --glass-blur: blur(22px) saturate(135%);
+  --glass-highlight: rgba(255, 255, 255, 0.78);
 
   font-family: 'Pretendard', 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --surface-page: #101820;
+  --surface-card: rgba(27, 40, 52, 0.72);
+  --surface-card-alt: rgba(35, 51, 65, 0.58);
+  --text-primary: #f4f7f8;
+  --text-secondary: #c7d3da;
+  --text-muted: #91a2ad;
+  --accent: #36b7aa;
+  --accent-strong: #61d1c3;
+  --accent-soft: rgba(54, 183, 170, 0.16);
+  --gridline: rgba(244, 247, 248, 0.10);
+  --baseline: rgba(244, 247, 248, 0.26);
+  --border: rgba(255, 255, 255, 0.17);
+  --status-good: #ff5b63;
+  --status-warning: #f2b544;
+  --status-critical: #69a0ff;
+  --status-good-bg: rgba(255, 91, 99, 0.16);
+  --status-warning-bg: rgba(242, 181, 68, 0.16);
+  --status-critical-bg: rgba(105, 160, 255, 0.16);
+  --signal-good-bg: linear-gradient(135deg, #192430 0%, #3a2228 100%);
+  --signal-critical-bg: linear-gradient(135deg, #192430 0%, #202f4c 100%);
+  --signal-warning-bg: linear-gradient(135deg, #192430 0%, #3c3320 100%);
+  --shadow-soft: 0 18px 42px rgba(0, 0, 0, 0.24), 0 2px 8px rgba(0, 0, 0, 0.14);
+  --glass-highlight: rgba(255, 255, 255, 0.14);
 }
 
 * {
@@ -52,8 +84,14 @@ body,
 }
 
 body {
-  background: var(--surface-page);
+  background:
+    radial-gradient(circle at 6% 4%, rgba(20, 143, 134, 0.13), transparent 28rem),
+    radial-gradient(circle at 94% 12%, rgba(54, 119, 216, 0.12), transparent 26rem),
+    radial-gradient(circle at 72% 96%, rgba(255, 91, 99, 0.06), transparent 24rem),
+    var(--surface-page);
   color: var(--text-primary);
+  letter-spacing: -0.012em;
+  background-attachment: fixed;
 }
 
 button,
@@ -104,6 +142,9 @@ input {
   border-radius: var(--radius-control);
   border: 1px solid var(--border);
   background: var(--surface-card-alt);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: inset 0 1px 0 var(--glass-highlight);
   color: var(--text-primary);
   font-size: 13px;
   font-weight: 600;
@@ -111,9 +152,9 @@ input {
   transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
 }
 .ctrl:hover {
-  background: color-mix(in srgb, var(--surface-card-alt) 80%, var(--accent) 20%);
+  background: color-mix(in srgb, var(--surface-card-alt) 88%, var(--accent) 12%);
   border-color: var(--accent);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 4px 12px rgba(35, 52, 66, 0.08);
 }
 .ctrl:active {
   transform: translateY(1px);
@@ -123,6 +164,11 @@ select.ctrl:focus-visible,
 a.ctrl:focus-visible {
   outline: 2px solid var(--accent-strong);
   outline-offset: 2px;
+}
+
+.theme-toggle {
+  min-width: 92px;
+  white-space: nowrap;
 }
 
 /* 지표 용어 도움말: 마우스 오버와 키보드 포커스 모두 지원 */
@@ -156,8 +202,10 @@ a.ctrl:focus-visible {
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--surface-card);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   color: var(--text-secondary);
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
+  box-shadow: 0 10px 28px rgba(35, 52, 66, 0.16);
   font-size: 11px;
   font-weight: 500;
   line-height: 1.5;
@@ -202,7 +250,7 @@ a.ctrl:focus-visible {
 
 @media (max-width: 720px) {
   .dashboard-page {
-    padding: 20px 14px 44px !important;
+    padding: 18px 14px 44px !important;
     gap: 14px !important;
   }
   .dashboard-main {
@@ -217,6 +265,9 @@ a.ctrl:focus-visible {
   }
   .insight-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+  .visualGrid {
+    grid-template-columns: 1fr !important;
   }
   .peer-summary {
     grid-template-columns: 1fr !important;

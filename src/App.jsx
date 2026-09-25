@@ -10,7 +10,7 @@ import TimingPanel from './components/TimingPanel';
 import { getSampleData, getTickerMeta, SAMPLE_TICKERS } from './data/sampleData';
 import { compareStrategies, compositeSignal, runBacktest } from './utils/indicators';
 import { parseCsvFile } from './utils/csv';
-import { fetchTossCandles } from './utils/tossApi';
+import { fetchKisCandles } from './utils/kisApi';
 import StrategyPanel from './components/StrategyPanel';
 import DashboardTabs from './components/DashboardTabs';
 import DecisionSummary from './components/DecisionSummary';
@@ -19,11 +19,13 @@ import PeerGroupPanel from './components/PeerGroupPanel';
 import PositioningPanel from './components/PositioningPanel';
 import { PEER_GROUPS } from './components/PeerGroupPanel';
 import MethodologyPanel from './components/MethodologyPanel';
+import DecisionWorkbench from './components/DecisionWorkbench';
 
 const DEFAULT_TICKER = SAMPLE_TICKERS[0].id;
 const DEFAULT_LIVE_SYMBOL = '005930';
 
 export default function App() {
+  const [theme, setTheme] = useState(() => window.localStorage.getItem('signal-dashboard-theme') || 'light');
   const [source, setSource] = useState({ type: 'sample', id: DEFAULT_TICKER });
   const [rawData, setRawData] = useState(() => getSampleData(DEFAULT_TICKER));
   const [uploadedName, setUploadedName] = useState('');
@@ -37,6 +39,11 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('signal');
   const [backtestConfig, setBacktestConfig] = useState({ transactionCost: 0, slippage: 0 });
   const [backtestWindow, setBacktestWindow] = useState(0);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    window.localStorage.setItem('signal-dashboard-theme', theme);
+  }, [theme]);
 
   const currency = useMemo(() => {
     if (source.type === 'sample') {
@@ -76,13 +83,13 @@ export default function App() {
     setError('');
     setLiveLoading(true);
     try {
-      const { rows, currency: cur } = await fetchTossCandles(symbol, { interval: '1d', count: 200 });
+      const { rows, currency: cur } = await fetchKisCandles(symbol, { count: 200 });
       setRawData(rows);
       setLiveCurrency(cur);
       setSource({ type: 'live', id: symbol.toUpperCase() });
       const peerIds = PEER_GROUPS[symbol.toUpperCase()]?.peers ?? [];
       setPeerLoading(peerIds.length > 0);
-      const peerResults = await Promise.allSettled(peerIds.map(async (peerId) => [peerId, (await fetchTossCandles(peerId, { interval: '1d', count: 200 })).rows]));
+      const peerResults = await Promise.allSettled(peerIds.map(async (peerId) => [peerId, (await fetchKisCandles(peerId, { count: 200 })).rows]));
       setPeerData(Object.fromEntries(peerResults.filter((result) => result.status === 'fulfilled').map((result) => result.value)));
       setPeerLoading(false);
     } catch (e) {
@@ -164,9 +171,12 @@ export default function App() {
             <p style={styles.subtitle}>
               RSI·MACD·ADX 기반 매수/매도 시그널 분석 — {label}
               {source.type === 'sample' && <span style={styles.demoTag}>샘플(시뮬레이션) 데이터</span>}
-              {source.type === 'live' && <span style={styles.liveTag}>실시간 시세 · 토스증권 Open API</span>}
+              {source.type === 'live' && <span style={styles.liveTag}>실시간 시세 · 한국투자증권 Open API</span>}
             </p>
           </div>
+          <button type="button" className="ctrl theme-toggle" onClick={() => setTheme((current) => current === 'light' ? 'dark' : 'light')} aria-label="테마 전환">
+            {theme === 'light' ? '다크 모드' : '라이트 모드'}
+          </button>
         </header>
 
         <main id="main-content" className="dashboard-main" style={styles.main}>
@@ -183,7 +193,7 @@ export default function App() {
           <div style={styles.sourceBar} role="status" aria-live="polite">
             <span style={styles.sourceDot} />
             <strong>{source.type === 'live' ? '실시간 데이터' : source.type === 'upload' ? '사용자 CSV' : '데모 데이터'}</strong>
-            <span>{source.type === 'live' ? '토스증권 Open API · 캔들 기반 지표 계산' : source.type === 'upload' ? uploadedName : '샘플 시계열 · API 키 없이 즉시 확인'}</span>
+            <span>{source.type === 'live' ? '한국투자증권 Open API · 일봉 기반 지표 계산' : source.type === 'upload' ? uploadedName : '샘플 시계열 · API 키 없이 즉시 확인'}</span>
             {liveLoading && <span style={styles.loadingText}>조회 중…</span>}
           </div>
           {source.type === 'live' && <label style={styles.refreshToggle}><input type="checkbox" checked={autoRefresh} onChange={(e) => setAutoRefresh(e.target.checked)} /> 1분마다 실시간 가격 자동 갱신</label>}
@@ -207,6 +217,14 @@ export default function App() {
                 weightMacd={last?.weightMacd}
               />
               <DashboardTabs activeTab={activeTab} onChange={setActiveTab} />
+
+              <DecisionWorkbench
+                activeTab={activeTab}
+                rows={enriched}
+                symbol={source.id}
+                sourceType={source.type}
+                currency={currency}
+              />
 
               {activeTab === 'signal' && <div style={styles.card}><MarketInsightPanel data={enriched} last={last} prev={prev} currency={currency} symbol={source.id} label={label} sourceType={source.type} /></div>}
 
@@ -290,6 +308,9 @@ const styles = {
     borderRadius: 'var(--radius-card)',
     padding: '20px 20px 12px',
     boxShadow: 'var(--shadow-soft)',
+    backdropFilter: 'var(--glass-blur)',
+    WebkitBackdropFilter: 'var(--glass-blur)',
+    boxSizing: 'border-box',
   },
   tableHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 },
   sectionTitle: { margin: '0 0 12px', fontSize: 14, color: 'var(--text-secondary)' },
